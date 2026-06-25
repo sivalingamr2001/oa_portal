@@ -1,0 +1,84 @@
+.fulfillment-container {
+  padding: 24px;
+  max-width: 1400px;
+  margin: 0 auto;
+  animation: fadeIn 0.4s ease-out;
+}
+
+.fulfillment-header {
+  margin-bottom: 24px;
+}
+
+/* Header Form Styles */
+.header-form {
+  padding: 8px 0;
+}
+
+/* Address Card Design */
+.address-card {
+  border-radius: 8px !important;
+  border: 1px solid var(--border-color) !important;
+  background-color: var(--bg-secondary) !important;
+  height: 100%;
+}
+
+.address-card .ant-card-head {
+  border-bottom: 1px solid var(--border-color) !important;
+  background-color: var(--bg-tertiary) !important;
+  font-weight: 600;
+  border-top-left-radius: 8px;
+  border-top-right-radius: 8px;
+}
+
+.address-detail-text {
+  background-color: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  padding: 10px;
+  border-radius: 6px;
+  margin-top: 10px;
+  font-style: italic;
+  animation: slideDown 0.2s ease-out;
+}
+
+/* Lines Section Card */
+.lines-card {
+  margin-top: 24px;
+}
+
+.line-item-row-container {
+  padding: 12px 8px;
+  border-radius: 8px;
+  transition: background-color 0.2s ease;
+}
+
+.line-item-row-container:hover {
+  background-color: rgba(0, 102, 204, 0.015);
+}
+
+.field-label-custom {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Demand Metrics Badge Spacing */
+.metrics-container {
+  padding: 8px 12px;
+  background: var(--bg-secondary);
+  border-radius: 6px;
+  border: 1px dashed var(--border-color);
+}
+
+/* Animations */
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

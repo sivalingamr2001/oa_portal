@@ -1,0 +1,171 @@
+.app-sider {
+  /* Swapped out plain white/gray for your premium system sidebar tokens */
+  background: var(--sidebar) !important; 
+  border-right: 1px solid var(--sidebar-border);
+  max-height: 100vh;
+  overflow-y: auto;
+  position: fixed;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 100;
+}
+
+.app-sider.ant-layout-sider-collapsed {
+  width: 80px !important;
+  max-width: 80px;
+}
+
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 16px;
+  border-bottom: 1px solid var(--sidebar-border);
+  height: 40px;
+  position: relative;
+}
+
+.sidebar-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+.logo-text {
+  font-size: 21px;
+  font-weight: 700;
+  /* Switched to clean dark-theme readable foreground text colors */
+  color: var(--sidebar-primary-foreground);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+
+.collapse-btn {
+  position: absolute;
+  right: -12px;
+  top: 3px;
+  width: 24px;
+  /* Keeps the toggle float handle clear and interactive */
+  background: var(--card) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 50% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer;
+  z-index: 110;
+  box-shadow: var(--shadow-sm);
+  color: var(--muted-foreground);
+  padding: 0 !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.collapse-btn:hover {
+  color: var(--primary-color);
+  border-color: var(--primary-color) !important;
+  background: var(--bg-tertiary) !important;
+  transform: scale(1.1);
+}
+
+.sidebar-menu {
+  border: none;
+  background: transparent;
+  margin-top: 16px;
+}
+
+.menu-section {
+  margin-bottom: 0px;
+}
+
+.menu-section-title {
+  padding: 0 12px 6px;
+  font-size: 11px;
+  font-weight: 700;
+  /* Subdued text styling for sections inside dark background canvas */
+  color: oklch(0.98 0.004 245);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.app-sider.ant-layout-sider-collapsed .sidebar-header {
+  justify-content: center;
+  padding: 16px 0;
+}
+
+.app-sider.ant-layout-sider-collapsed .sidebar-logo {
+  justify-content: center;
+  gap: 0;
+}
+
+.app-sider.ant-layout-sider-collapsed .menu-section-title {
+  opacity: 0;
+  height: 0;
+  padding: 0;
+  margin: 0;
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  margin: 0 8px;
+  border-radius: var(--radius); /* Leverages global radius engine variable */
+  color: var(--muted-foreground);
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.menu-item:hover {
+  background: var(--primary-color);
+  color: whitesmoke;
+}
+
+.menu-item.active {
+  /* Replaced hex transparency with targeted sidebar primary coloring matrix definitions */
+  background: var(--sidebar-primary);
+  color: var(--sidebar-primary-foreground);
+  font-weight: 600;
+}
+
+.menu-item svg {
+  flex-shrink: 0;
+  min-width: 18px;
+}
+
+.app-sider.ant-layout-sider-collapsed .menu-item {
+  justify-content: center;
+  padding: 10px;
+  margin: 0 4px;
+}
+
+.app-sider.ant-layout-sider-collapsed .menu-item span {
+  display: none;
+}
+
+/* Custom scrollbar matching your theme token parameters */
+.app-sider::-webkit-scrollbar {
+  width: 6px;
+}
+
+.app-sider::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.app-sider::-webkit-scrollbar-thumb {
+  background: var(--border-color); /* Integrates borders as track bounds markers */
+  border-radius: 3px;
+}
+
+.app-sider::-webkit-scrollbar-thumb:hover {
+  background: var(--muted-foreground);
+}

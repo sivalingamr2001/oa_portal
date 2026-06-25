@@ -1,0 +1,67 @@
+# User and system files
+*.swp
+*.swo
+*.tmp
+*.log
+*.user
+*.suo
+*.cache
+.DS_Store
+Thumbs.db
+
+# Visual Studio
+.vs/
+*.vcxproj.user
+*.vcxproj.filters
+*.dbmdl
+*.opendb
+*.vscode/
+
+# .NET build outputs
+bin/
+obj/
+**/bin/
+**/obj/
+
+# ASP.NET Core and Blazor
+*.db
+*.bak
+*.backup
+*.Publish.xml
+
+# Logs and diagnostics
+logs/
+*.log
+*.vspscc
+*.vssscc
+
+# Node / frontend
+node_modules/
+dist/
+dist-ssr/
+.vite/
+build/
+coverage/
+
+# npm/yarn/pnpm
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Rider
+.idea/
+
+# Workspace settings
+*.code-workspace
+
+# Ignore generated client/server files
+**/ApiEndpoints.json
+**/project.assets.json
+**/*.cache
+**/*.pdb
+**/*.dll
+**/*.exe
+**/*.runtimeconfig.json
+**/*.deps.json
+Server/bin/Debug/net8.0/Backend.pdb

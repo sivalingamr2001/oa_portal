@@ -1,0 +1,151 @@
+@import 'antd/dist/reset.css';
+
+:root {
+  /* --- 1. Base OKLCH Color Engine Tokens --- */
+  --background: oklch(0.98 0.004 245);
+  --foreground: oklch(0.25 0.03 245);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.25 0.03 245);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.25 0.03 245);
+  --primary: oklch(67.75% 0.179 233.16);
+  --primary-foreground: oklch(0.98 0.01 245);
+  --secondary: oklch(0.96 0.012 245);
+  --secondary-foreground: oklch(0.25 0.03 245);
+  --muted: oklch(0.96 0.012 245);
+  --muted-foreground: oklch(0.55 0.03 245);
+  --accent: oklch(61.854% 0.15996 250.038);
+  --accent-foreground: oklch(0.98 0.01 245);
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.98 0.01 0);
+  --border: oklch(0.91 0.015 245);
+  --input: oklch(0.91 0.015 245);
+  --ring: oklch(0.49 0.2 258);
+  --radius: 0.7rem;
+
+  /* --- 2. Charting & Sidebar Core Variables --- */
+  --chart-1: oklch(0.49 0.2 258);
+  --chart-2: oklch(0.62 0.16 250);
+  --chart-3: oklch(0.71 0.11 240);
+  --chart-4: oklch(0.79 0.07 235);
+  --chart-5: oklch(0.87 0.04 230);
+  --sidebar: oklch(0.25 0.03 245);
+  --sidebar-foreground: oklch(0.25 0.03 245);
+  --sidebar-primary: oklch(0.64 0.18 255);
+  --sidebar-primary-foreground: oklch(0.98 0.01 245);
+  --sidebar-accent: oklch(0.96 0.012 245);
+  --sidebar-accent-foreground: oklch(0.25 0.03 245);
+  --sidebar-border: oklch(0.91 0.015 245);
+  --sidebar-ring: oklch(0.49 0.2 258);
+
+  /* --- 3. Unified Semantic Mappings (Merged Matrix) --- */
+  --primary-color: var(--primary);
+  --primary-dark: oklch(55% 0.16 233.16);
+  --primary-light: oklch(75% 0.14 233.16);
+  --secondary-color: var(--secondary);
+  --success-color: oklch(0.72 0.16 142);
+  --warning-color: oklch(0.79 0.15 85);
+  --error-color: var(--destructive);
+  --info-color: var(--accent);
+  
+  /* Text & Structural Surface Layers mapped to OKLCH variables */
+  --text-primary: var(--foreground);
+  --text-secondary: var(--muted-foreground);
+  --bg-primary: var(--card);
+  --bg-secondary: var(--background);
+  --bg-tertiary: var(--muted);
+  --border-color: var(--border);
+
+  /* Elevation Shadows */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+
+  /* --- 4. Direct Ant Design Core Token Overrides --- */
+  --ant-primary-color: var(--primary-color);
+  --ant-primary-color-hover: var(--primary-light);
+  --ant-primary-color-active: var(--primary-dark);
+  --ant-success-color: var(--success-color);
+  --ant-error-color: var(--error-color);
+  --ant-warning-color: var(--warning-color);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  color: var(--text-primary);
+  background-color: var(--bg-secondary);
+}
+
+#root {
+  width: 100%;
+  height: 100%;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-tertiary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e0;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a0aec0;
+}
+
+/* Ant Design customization */
+.ant-btn-primary {
+  background-color: var(--primary-color) !important;
+  border-color: var(--primary-color) !important;
+}
+
+.ant-btn-primary:hover {
+  background-color: var(--primary-light) !important;
+  border-color: var(--primary-light) !important;
+}
+
+.ant-select-selector {
+  background-color: var(--bg-primary) !important;
+  border-color: var(--border-color) !important;
+}
+
+.ant-input,
+.ant-input-number {
+  background-color: var(--bg-primary) !important;
+  border-color: var(--border-color) !important;
+}
+
+/* Smooth animations */
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
