@@ -12,7 +12,6 @@ public sealed class AuthController(IAllocationService allocationService) : Contr
     private readonly IAllocationService _allocationService = allocationService;
 
     [HttpPost("login")]
-    [HttpPost("login-details")]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(RegionDetailsDto))]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<RegionDetailsDto>> GetRegionDetailsAfterLogin(

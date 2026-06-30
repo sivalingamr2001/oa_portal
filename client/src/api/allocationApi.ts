@@ -1,4 +1,5 @@
 import { axiosClient } from "../lib/axiosClient";
+import type { B3LineWithMetricsDto } from "./types";
 
 const BASE = "/Allocation";
 const BIN_BASE = "/BinAllocation";
@@ -139,6 +140,7 @@ export interface AllocationRow extends B3Header {
   closureFlag: "Y" | "N" | "C";
   revision: number;
   oldRequestedQty?: number;
+  headerCode?: string | null;
 }
 
 export interface AllocationSummary {
@@ -262,10 +264,10 @@ export const loginApi = async (
   username: string,
   password?: string,
 ): Promise<RegionDetailsDto> => {
-  const response = await axiosClient.post<RegionDetailsDto>(
-    "/Auth/login-details",
-    { username, password },
-  );
+  const response = await axiosClient.post<RegionDetailsDto>("/Auth/login", {
+    username,
+    password,
+  });
   return response.data;
 };
 
@@ -285,10 +287,11 @@ export const getRegions = async (): Promise<Region[]> => {
 export const getBillToCustomers = async (
   region: string,
   subRegion: string,
+  orgId: number | null,
 ): Promise<Customer[]> => {
   const { data } = await axiosClient.get<Customer[]>(
     `${BASE}/customers/bill-to`,
-    { params: { region, subRegion } },
+    { params: { region, subRegion, orgId } },
   );
   return data;
 };
@@ -298,12 +301,12 @@ export const getBillToCustomers = async (
  * Get ship-to customers by region and sub-region
  */
 export const getShipToCustomers = async (
-  region: string,
-  subRegion: string,
+  orgId: number | null,
+  customerId: number | null,
 ): Promise<Customer[]> => {
   const { data } = await axiosClient.get<Customer[]>(
     `${BASE}/customers/ship-to`,
-    { params: { region, subRegion } },
+    { params: { orgId, customerId } },
   );
   return data;
 };
@@ -386,6 +389,19 @@ export const getOrganizations = async (): Promise<Organization[]> => {
 };
 
 /**
+ * GET /api/Allocation/organizations-by/{OuId}
+ * Get organizations by OU ID
+ */
+export const getOrganizationsByOuId = async (
+  OuId: number,
+): Promise<Organization[]> => {
+  const { data } = await axiosClient.get<Organization[]>(
+    `${BASE}/organizations-by/${OuId}`,
+  );
+  return data;
+};
+
+/**
  * GET /api/Allocation/items
  * Get paginated inventory items with optional search
  */
@@ -450,7 +466,9 @@ export const createAllocation = async (
  * Get all bin allocations (header + lines joined).
  * GET /api/binallocation
  */
-export const getAllAllocations = async (currentUser: string): Promise<AllocationRow[]> => {
+export const getAllAllocations = async (
+  currentUser: string,
+): Promise<AllocationRow[]> => {
   const cacheKey = `${BIN_BASE}?user=${currentUser}`;
   const cached = apiCache[cacheKey];
   const now = Date.now();
@@ -462,7 +480,7 @@ export const getAllAllocations = async (currentUser: string): Promise<Allocation
 
   // Pass the user string safely as a URL query string parameter string to your C# Controller backend
   const { data } = await axiosClient.get<AllocationRow[]>(BIN_BASE, {
-    params: { currentUser }
+    params: { currentUser },
   });
 
   // Save to user-isolated cache space
@@ -495,20 +513,24 @@ export const getAllocationByHeaderId = async (
  * Get dashboard summary per header (totals, approved, pending, cancelled).
  * GET /api/binallocation/summary
  */
-export const getAllocationSummary = async (currentUser: string): Promise<AllocationSummary[]> => {
+export const getAllocationSummary = async (
+  currentUser: string,
+): Promise<AllocationSummary[]> => {
   const { data } = await axiosClient.get<AllocationSummary[]>(
-    `${BIN_BASE}/summary`, 
-    { params: { currentUser } }
+    `${BIN_BASE}/summary`,
+    { params: { currentUser } },
   );
   return data;
 };
 
 /**
- * Get all lines currently pending HOD approval.
+ * Get all lines currently pending approval along with their demand metrics.
  * GET /api/binallocation/pending-approval
  */
-export const getPendingApprovalLines = async (): Promise<B3Line[]> => {
-  const { data } = await axiosClient.get<B3Line[]>(
+export const getPendingApprovalLines = async (): Promise<
+  B3LineWithMetricsDto[]
+> => {
+  const { data } = await axiosClient.get<B3LineWithMetricsDto[]>(
     `${BIN_BASE}/pending-approval`,
   );
   return data;

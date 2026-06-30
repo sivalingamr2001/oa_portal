@@ -2,6 +2,7 @@ using Backend.Interfaces;
 using Backend.Models;
 using Microsoft.AspNetCore.Mvc;
 using System.ComponentModel.DataAnnotations;
+using System.Security.Cryptography;
 
 namespace Backend.Controllers;
 
@@ -29,20 +30,21 @@ public sealed class AllocationController(IAllocationService allocationService) :
     public async Task<ActionResult<IEnumerable<CustomerDto>>> GetBillToCustomers(
         [FromQuery] string region,
         [FromQuery] string subRegion,
+        [FromQuery] int orgId,
         CancellationToken cancellationToken = default)
     {
-        var customers = await _allocationService.GetBillToCustomersAsync(region, subRegion, cancellationToken);
+        var customers = await _allocationService.GetBillToCustomersAsync(region, subRegion, orgId, cancellationToken);
         return Ok(customers);
     }
 
     [HttpGet("customers/ship-to")]
-    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(IEnumerable<CustomerDto>))]
-    public async Task<ActionResult<IEnumerable<CustomerDto>>> GetShipToCustomers(
-        [FromQuery] string region,
-        [FromQuery] string subRegion,
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(IEnumerable<ShipToCustomerDto>))]
+    public async Task<ActionResult<IEnumerable<ShipToCustomerDto>>> GetShipToCustomers(
+        [FromQuery] int orgId,
+        [FromQuery] int customerId,
         CancellationToken cancellationToken = default)
     {
-        var customers = await _allocationService.GetShipToCustomersAsync(region, subRegion, cancellationToken);
+        var customers = await _allocationService.GetShipToCustomersAsync(orgId, customerId, cancellationToken);
         return Ok(customers);
     }
 
@@ -111,6 +113,18 @@ public sealed class AllocationController(IAllocationService allocationService) :
         CancellationToken cancellationToken)
     {
         var result = await _allocationService.GetInventoryOrganizationsAsync(cancellationToken);
+        return Ok(result);
+    }
+
+    [HttpGet("organizations-by/{ouId:int}")]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(IEnumerable<OrganizationDto>))]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<IEnumerable<OrganizationDto>>> GetOrganizationsByOuId(
+    int ouId,
+    CancellationToken cancellationToken)
+    {
+        // Call the correct service method using the route parameter
+        var result = await _allocationService.GetInventoryOrganizationsByOuIdAsync(ouId, cancellationToken);
         return Ok(result);
     }
 

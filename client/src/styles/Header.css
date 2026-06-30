@@ -1,131 +1,87 @@
+/* Header Structural Layout */
 .app-header {
-  background: var(--bg-primary);
-  border-bottom: 1px solid var(--border-color);
-  box-shadow: var(--shadow-sm);
+  display: flex !important;
+  align-items: center;
+  justify-content: space-between; /* Pushes toggle left, group right */
+  width: 100%;
+  height: 40px !important; /* Standard explicit header height */
+  line-height: 56px !important;
+  background: #ffffff;
   padding: 0 24px;
-  height: 40px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  border-bottom: 1px solid #f0f0f0;
+}
+
+/* Right side cluster container */
+.header-right-group {
   display: flex;
   align-items: center;
-  position: relative;
-  z-index: 99;
-}
-
-.header-title {
-  margin: 0;
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--text-primary);
-  min-width: 300px;
-}
-
-.header-center {
-  display: flex;
-  justify-content: center;
-}
-
-.filter-bar {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.filter-group {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.filter-group label {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-secondary);
-  white-space: nowrap;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.filter-group .ant-select {
-  min-width: 120px;
-}
-
-.header-actions {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.role-selector {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.role-selector label {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-secondary);
-  white-space: nowrap;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.role-selector .ant-select {
-  min-width: 140px;
-}
-
-.logo-container {
-  display: flex;
-  align-items: center;
+  gap: 24px; /* Space between logo and profile card */
 }
 
 .logo-img {
-  height: 18px;
+  height: 24px;
   width: auto;
-  object-fit: contain;
-  object-position: left;
+  display: block;
 }
 
-/* Responsive adjustments */
-@media (max-width: 1200px) {
-  .filter-bar {
-    gap: 12px;
-  }
-
-  .filter-group .ant-select {
-    min-width: 100px;
-  }
-
-  .role-selector .ant-select {
-    min-width: 120px;
-  }
+/* Sliding Container Window */
+.profile-sliding-container {
+  position: relative;
+  height: 34px;
+  min-width: 120px;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+  overflow: hidden; /* Important: crops elements sliding out of bounds */
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
 }
 
-@media (max-width: 768px) {
-  .app-header {
-    flex-wrap: wrap;
-    height: auto;
-    padding: 12px 16px;
-    gap: 12px;
-  }
+/* Global transitions for slide layer wrappers */
+.profile-info-slide,
+.logout-info-slide {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  font-weight: 500;
+  font-size: 14px;
+}
 
-  .header-title {
-    min-width: 100%;
-    font-size: 16px;
-  }
+/* Default state positioning */
+.profile-info-slide {
+  transform: translateY(0);
+  color: #334155;
+}
 
-  .header-center {
-    min-width: 100%;
-    order: 3;
-  }
+/* Hidden down below default view frame */
+.logout-info-slide {
+  transform: translateY(100%);
+  color: #ef4444; /* Clean destructive red text */
+}
 
-  .filter-bar {
-    flex-wrap: wrap;
-    gap: 8px;
-  }
+/* Hover Action: Vertical transformation shift */
+.profile-sliding-container:hover {
+  background: #fef2f2;
+  border-color: #fee2e2;
+}
 
-  .header-actions {
-    min-width: 100%;
-    order: 4;
-    gap: 8px;
-  }
+.profile-sliding-container:hover .profile-info-slide {
+  transform: translateY(-100%); /* Slides up and out */
+}
+
+.profile-sliding-container:hover .logout-info-slide {
+  transform: translateY(0); /* Slides up into focus frame */
+}
+
+.username-text {
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

@@ -13,6 +13,12 @@ public class CustomerDto
     public string Region { get; set; }
 }
 
+public class ShipToCustomerDto
+{
+    public long CustomerId { get; set; }
+    public string CustomerName { get; set; }
+}
+
 public class EmployeeDto
 {
     public string LastName { get; set; }

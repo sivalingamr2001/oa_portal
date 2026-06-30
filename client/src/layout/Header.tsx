@@ -1,5 +1,5 @@
 import { Button, Flex, Layout } from 'antd';
-import { LogOut, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { LogOut, PanelLeftClose, PanelLeftOpen, User2 } from 'lucide-react';
 import React, { useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import Logo from '../lib/constants';
@@ -13,7 +13,7 @@ interface TopHeaderProps {
 }
 
 export const TopHeader: React.FC<TopHeaderProps> = ({ collapsed, onCollapse }) => {
-  const { logout } = useAuth();
+  const { currentUser, logout } = useAuth();
 
   const logoElement = useMemo(() => (
     <div className="logo-container">
@@ -22,28 +22,35 @@ export const TopHeader: React.FC<TopHeaderProps> = ({ collapsed, onCollapse }) =
   ), []);
 
   return (
-    <Header
-      className="app-header"
-      style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}
-    >
+    <Header className="app-header">
+      {/* Far Left: Toggle Button */}
       <Button
         type="text"
-        icon={collapsed ? <PanelLeftOpen size={15} /> : <PanelLeftClose size={15} />}
+        icon={collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
         onClick={() => onCollapse(!collapsed)}
         aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
       />
 
+      {/* Far Right: Logo + Sliding Profile Combo */}
+      <div className="header-right-group">
+        {logoElement}
 
-      <Flex className="header-actions" align="center" gap="middle">      {logoElement} <div style={{width:1, height:18, background: '#999'}}></div>
-        <Button
-          type="text"
-          danger
-          icon={<LogOut size={20} />}
-          onClick={logout}
-          aria-label="Logout"
-          className="logout-btn"
-        />
-      </Flex>
+        <div style={{ width: 1, height: 18, background: '#999' }}></div>
+
+        <div className="profile-sliding-container" onClick={logout}>
+          {/* Default state view: Username */}
+          <Flex align="center" gap="small" className="profile-info-slide">
+            <User2 size={16} />
+            <span className="username-text">{currentUser?.username}</span>
+          </Flex>
+
+          {/* Hover state view: Logout */}
+          <Flex align="center" gap="small" className="logout-info-slide">
+            <LogOut size={16} />
+            <span>Log Out</span>
+          </Flex>
+        </div>
+      </div>
     </Header>
   );
 };

@@ -265,12 +265,19 @@ namespace Backend.Shared
         public const string HodApproveAllocationLine = @"
             UPDATE JAN_B3_LINES
             SET
-                B3_APPROVED_QUANTITY = :p_approved_quantity,
+                B3_APPROVED_QUANTITY = CASE 
+                                          WHEN LINE_ID = :p_line_id THEN :p_approved_quantity 
+                                          ELSE B3_QUANTITY 
+                                       END,
                 APPROVAL_FLAG        = 'Y',
                 APPROVED_DATE        = SYSDATE,
                 APPROVED_BY          = :p_approved_by
             WHERE
-                LINE_ID = :p_line_id
+                (
+                    LINE_ID = :p_line_id 
+                    OR LINE_ID = (SELECT PARENT_LINE_ID FROM JAN_B3_LINES WHERE LINE_ID = :p_line_id)
+                    OR PARENT_LINE_ID = :p_line_id
+                )
                 AND APPROVAL_FLAG = 'N'   -- Only pending lines can be approved
                 AND CLOSURE_FLAG  = 'N'   -- Only open lines";
 
@@ -279,25 +286,15 @@ namespace Backend.Shared
         /// </summary>
         public const string GetPendingApprovalLines = @"
             SELECT
-                l.LINE_ID,
-                l.HEADER_ID,
-                h.TRANSACTION_DATE,
-                h.CUSTOMER_ID,
-                h.TERRITORY_ID,
-                l.ORGANIZATION_ID,
-                l.INVENTORY_ITEM_ID,
-                l.B3_QUANTITY,
-                l.TARGET_DATE,
-                l.REVISION
+                l.*,
+                h.*
             FROM
                 JAN_B3_LINES   l
                 JOIN JAN_B3_HEADER h ON h.HEADER_ID = l.HEADER_ID
             WHERE
                 l.APPROVAL_FLAG = 'N'
-                AND l.CLOSURE_FLAG = 'N'
             ORDER BY
                 h.TRANSACTION_DATE, l.LINE_ID";
-
 
         // ============================================================
         // 5. AMEND APPROVED QUANTITY (HOD amendments post-approval)

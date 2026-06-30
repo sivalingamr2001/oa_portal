@@ -8,22 +8,19 @@ import {
   Popover,
   Select,
   Space,
-  Tag,
   Tooltip,
   Typography
 } from 'antd';
-import { ArrowRight, Check, Eye, History, UserCheck, X } from 'lucide-react';
+import { ArrowRight, Check, History, UserCheck, X } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import type { AllocationRow } from '../api/allocationApi';
 import {
   approveLine,
   cancelAllLines,
   cancelLine,
-  getAllAllocations
+  getPendingApprovalLines
 } from '../api/allocationApi';
 import { DynamicGrid } from '../components/DynamicGrid';
-import { Loader } from '../components/Loader';
 import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
 import { useLoader } from '../hooks/useLoader';
@@ -32,10 +29,22 @@ import '../styles/Approvals.css';
 const { Title, Text } = Typography;
 const { Option } = Select;
 
+// API response wrapper type
+interface ApiAllocationRow {
+  allocation: AllocationRow;
+  metrics: {
+    oaPendingQuantity: number;
+    oaRsvQty: number;
+    oaPickedQty: number;
+    binQty: number;
+    binRsvQty: number;
+  };
+}
+
 export const Approvals = () => {
   const { addNotification } = useNotification();
-  const [allocations, setAllocations] = useState<AllocationRow[]>([]);
-  const { loading, withLoader } = useLoader();
+  const [allocations, setAllocations] = useState<ApiAllocationRow[]>([]);
+  const { withLoader } = useLoader();
 
   const [approvedQuantities, setApprovedQuantities] = useState<{ [key: number]: number }>({});
 
@@ -50,21 +59,18 @@ export const Approvals = () => {
   const [customCancelAllReason, setCustomCancelAllReason] = useState<string>('');
   const { currentUser } = useAuth();
 
-  const navigate = useNavigate()
-
   const loadData = async () => {
     try {
-      const allData = await withLoader(() => getAllAllocations(currentUser?.username || ''));
-      // Only keep pending records (approvalFlag === 'N')
-      const pendingData = allData.filter(row => row.approvalFlag === 'N' && row.closureFlag === 'N');
+      const pendingData: any[] = await withLoader(() => getPendingApprovalLines());
       setAllocations(pendingData);
 
       const pendingQuantities: { [key: number]: number } = {};
-      pendingData.forEach(row => {
-        if (row.closureFlag === 'N') {
-          pendingQuantities[row.lineId] = row.b3Quantity;
+      pendingData.forEach((row) => {
+        if (row.allocation.closureFlag === 'N') {
+          pendingQuantities[row.allocation.lineId] = row.allocation.b3Quantity;
         }
       });
+
       setApprovedQuantities(prev => ({ ...prev, ...pendingQuantities }));
     } catch (err) {
       message.error('Failed to retrieve pending allocations.');
@@ -121,7 +127,7 @@ export const Approvals = () => {
 
   const handleApproveAll = async (headerId: number) => {
     const linesToApprove = allocations.filter(
-      r => r.headerId === headerId && r.approvalFlag === 'N' && r.closureFlag === 'N'
+      r => r.allocation.headerId === headerId && r.allocation.approvalFlag === 'N' && r.allocation.closureFlag === 'N'
     );
 
     if (linesToApprove.length === 0) {
@@ -131,10 +137,10 @@ export const Approvals = () => {
 
     try {
       await Promise.all(
-        linesToApprove.map(line =>
+        linesToApprove.map(row =>
           approveLine({
-            lineId: line.lineId,
-            approvedQuantity: approvedQuantities[line.lineId] ?? line.b3Quantity,
+            lineId: row.allocation.lineId,
+            approvedQuantity: approvedQuantities[row.allocation.lineId] ?? row.allocation.b3Quantity,
             approvedBy: currentUser?.username || null
           })
         )
@@ -174,36 +180,35 @@ export const Approvals = () => {
     const headerGroups: { [key: number]: any } = {};
 
     allocations.forEach(row => {
-      if (!headerGroups[row.headerId]) {
-        headerGroups[row.headerId] = {
-          headerId: row.headerId,
-          transactionDate: row.transactionDate,
-          customerName: row.customerName || 'Open Pool',
-          customerRegion: row.customerRegion,
-          createdBy: row.createdBy,
+      if (!headerGroups[row.allocation.headerId]) {
+        headerGroups[row.allocation.headerId] = {
+          headerId: row.allocation.headerId,
+          headerCode: row.allocation.headerCode,
+          transactionDate: row.allocation.transactionDate,
+          customerName: row.allocation.customerName || 'Open Pool',
+          customerRegion: row.allocation.customerRegion,
+          createdBy: row.allocation.createdBy,
           pendingLinesCount: 0
         };
       }
-      headerGroups[row.headerId].pendingLinesCount += 1;
+      headerGroups[row.allocation.headerId].pendingLinesCount += 1;
     });
 
     return Object.values(headerGroups).sort((a, b) => b.headerId - a.headerId);
   }, [allocations]);
 
   const parentColumns = [
-    // {
-    //   title: 'Header ID',
-    //   dataIndex: 'headerId',
-    //   key: 'headerId',
-    //   render: (id: number) => <strong style={{ color: 'var(--primary-color)' }}>{id}</strong>,
-    //   sorter: (a: any, b: any) => a.headerId - b.headerId
-    // },
     {
       title: 'Header code',
+      // 1. Tell Ant Design to look inside the nested allocation object
       dataIndex: 'headerCode',
       key: 'headerCode',
-      render: (headerCode: string) => <strong style={{ color: 'var(--primary-color)' }}>{headerCode ? headerCode : 'N/A'}</strong>,
-      sorter: (a: any, b: any) => a.headerId - b.headerId
+      // 2. Add the dynamic fallback check inside the rendering layer
+      render: (headerCode: string) => (
+        <strong style={{ color: 'var(--primary-color)' }}>
+          {headerCode ? headerCode : 'N/A'}
+        </strong>
+      )
     },
     {
       title: 'Transaction Date',
@@ -243,8 +248,7 @@ export const Approvals = () => {
       key: 'bulkActions',
       render: (_: any, record: any) => (
         <Space size="middle">
-          {/* 1. View Action Tooltip */}
-          <Tooltip title="View Details" placement="top">
+          {/* <Tooltip title="View Details" placement="top">
             <Button
               type="primary"
               size="small"
@@ -252,9 +256,8 @@ export const Approvals = () => {
               icon={<Eye size={14} />}
               style={{ borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
             />
-          </Tooltip>
+          </Tooltip> */}
 
-          {/* 2. Approve All Action Tooltip */}
           <Tooltip title="Approve All Lines" placement="top">
             <Button
               type="primary"
@@ -265,7 +268,6 @@ export const Approvals = () => {
             />
           </Tooltip>
 
-          {/* 3. Cancel All Action Tooltip Wrapped Around Popover Anchor */}
           <Popover
             title="Cancel Entire B3"
             trigger="click"
@@ -346,50 +348,80 @@ export const Approvals = () => {
             </Tooltip>
           </Popover>
         </Space>
-
       )
     }
   ];
 
+  // ─── Metrics row component ───
+  const MetricsRow = ({ metrics }: { metrics: ApiAllocationRow['metrics'] }) => (
+    <div
+      style={{
+        display: 'flex',
+        flexWrap: 'wrap',
+        gap: 12,
+        padding: '8px 16px',
+        marginTop: 8,
+        backgroundColor: '#f8fafc',
+        borderRadius: 6,
+        border: '1px dashed #e2e8f0'
+      }}
+    >
+      <span style={{ fontSize: '12px', color: '#3b82f6', fontWeight: 500 }}>
+        OA Pending Qty: <strong>{metrics.oaPendingQuantity}</strong>
+      </span>
+      <span style={{ fontSize: '12px', color: '#eab308', fontWeight: 500 }}>
+        OA Reserved Qty: <strong>{metrics.oaRsvQty}</strong>
+      </span>
+      <span style={{ fontSize: '12px', color: '#22c55e', fontWeight: 500 }}>
+        OA Picked Qty: <strong>{metrics.oaPickedQty}</strong>
+      </span>
+      <span style={{ fontSize: '12px', color: '#a855f7', fontWeight: 500 }}>
+        Bin Qty: <strong>{metrics.binQty}</strong>
+      </span>
+      <span style={{ fontSize: '12px', color: '#14b8a6', fontWeight: 500 }}>
+        Bin Reserved Qty: <strong>{metrics.binRsvQty}</strong>
+      </span>
+    </div>
+  );
+
   const renderExpandedRow = (record: any) => {
     const pendingLines = allocations.filter(
-      r => r.headerId === record.headerId && r.approvalFlag === 'N' && r.closureFlag === 'N'
+      r => r.allocation.headerId === record.headerId && r.allocation.approvalFlag === 'N' && r.allocation.closureFlag === 'N'
     );
 
-    // ─── LINE COLUMNS (labels only, no IDs) ───
     const childColumns = [
       {
         title: 'Organization',
         dataIndex: 'organizationCode',
         key: 'organizationCode',
-        render: (code: string | undefined) => code || '-'
+        render: (code: string | undefined, row: ApiAllocationRow) => row.allocation.organizationCode || code || ""
       },
       {
         title: 'Item',
         key: 'itemDetails',
-        render: (_: any, line: AllocationRow) => (
+        render: (_: any, row: ApiAllocationRow) => (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <Typography.Text strong style={{ color: 'var(--text-primary)' }}>
-              {line.itemCode || 'N/A'}
+              {row.allocation.itemCode || 'N/A'}
             </Typography.Text>
             <Typography.Text type="secondary" style={{ fontSize: '12px' }}>
-              {line.itemDescription || 'No description'}
+              {row.allocation.itemDescription || 'No description'}
             </Typography.Text>
           </div>
         )
       },
       {
         title: 'Target Date',
-        dataIndex: 'targetDate',
         key: 'targetDate',
         width: 120,
-        render: (date: string | null) => date ? new Date(date).toLocaleDateString() : '—'
+        render: (_: any, row: ApiAllocationRow) => row.allocation.targetDate ? new Date(row.allocation.targetDate).toLocaleDateString() : '—'
       },
       {
         title: 'Requested Qty',
         key: 'quantityTracking',
         align: 'center',
-        render: (_: any, line: AllocationRow) => {
+        render: (_: any, row: ApiAllocationRow) => {
+          const line = row.allocation;
           const hasHistory = line.revision > 0 && line.oldRequestedQty !== null && line.oldRequestedQty !== undefined;
           return (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
@@ -419,143 +451,129 @@ export const Approvals = () => {
       {
         title: 'Approved Qty Input',
         key: 'approvedQtyInput',
-        render: (_: any, line: AllocationRow) => (
+        render: (_: any, row: ApiAllocationRow) => (
           <InputNumber
             min={1}
-            value={approvedQuantities[line.lineId] ?? line.b3Quantity}
-            onChange={(val) => setApprovedQuantities({ ...approvedQuantities, [line.lineId]: val || 0 })}
+            value={approvedQuantities[row.allocation.lineId] ?? row.allocation.b3Quantity}
+            onChange={(val) => setApprovedQuantities({ ...approvedQuantities, [row.allocation.lineId]: val || 0 })}
             style={{ width: 100, borderRadius: 6 }}
           />
         )
       },
       {
         title: 'Remarks',
-        dataIndex: 'remarks',
         key: 'remarks',
-        render: (remarks: string | null) => remarks || <Text type="secondary" style={{ fontSize: '12px' }}>-</Text>
-      },
-      {
-        title: 'Amendment Reason',
-        dataIndex: 'amendmentReason',
-        key: 'amendmentReason',
-        render: (reason: string | null) => reason ? (
-          <Tag color="blue" style={{ fontSize: '11px', maxWidth: 200, whiteSpace: 'normal', wordBreak: 'break-word' }}>
-            {reason}
-          </Tag>
-        ) : (
-          <Text type="secondary" style={{ fontSize: '12px' }}>-</Text>
-        )
+        render: (_: any, row: ApiAllocationRow) => row.allocation.remarks || <Text type="secondary" style={{ fontSize: '12px' }}>-</Text>
       },
       {
         title: 'Actions',
         key: 'actions',
-        render: (_: any, line: AllocationRow) => (
-          <Space>
-            <Tooltip title="Approve Line">
-              <Button
-                type="text"
-                className="action-btn-approve"
-                icon={<Check size={18} color="var(--success-color)" />}
-                onClick={() => handleApproveLine(line.lineId, line.b3Quantity)}
-              />
-            </Tooltip>
-
-            <Popover
-              title="Cancel Line"
-              trigger="click"
-              open={activeCancelLineId === line.lineId}
-              onOpenChange={(visible) => {
-                if (visible) {
-                  setActiveCancelLineId(line.lineId);
-                  setCancelReason('');
-                  setCustomCancelReason('');
-                } else {
-                  setActiveCancelLineId(null);
-                }
-              }}
-              content={
-                <Space direction="vertical" size={12} style={{ width: 260, padding: '4px 0' }}>
-                  <div>
-                    <div style={{ fontSize: '12px', fontWeight: 500, marginBottom: 4 }}>
-                      Cancel Qty
-                    </div>
-                    <InputNumber
-                      min={1}
-                      max={line.b3Quantity}
-                      value={line.b3Quantity}
-                      disabled
-                      style={{ width: '100%', borderRadius: 4, backgroundColor: '#f5f5f5' }}
-                    />
-                    <div style={{ fontSize: '11px', color: 'var(--text-secondary, #8c8c8c)', marginTop: 2 }}>
-                      Will cancel full quantity: {line.b3Quantity}
-                    </div>
-                  </div>
-
-                  <div>
-                    <div style={{ fontSize: '12px', fontWeight: 500, marginBottom: 4 }}>
-                      Reason <span style={{ color: '#ff4d4f' }}>*</span>
-                    </div>
-                    <Select
-                      placeholder="Select reason..."
-                      value={cancelReason || undefined}
-                      onChange={(val) => setCancelReason(val)}
-                      style={{ width: '100%' }}
-                    >
-                      <Option value="Production schedule revised">Production schedule revised</Option>
-                      <Option value="Customer request reduction">Customer request reduction</Option>
-                      <Option value="Forecast correction">Forecast correction</Option>
-                      <Option value="Raw material constraint">Raw material constraint</Option>
-                      <Option value="Order cancellation by customer">Order cancellation by customer</Option>
-                      <Option value="Quality hold">Quality hold</Option>
-                      <Option value="Other">Other</Option>
-                    </Select>
-                  </div>
-
-                  {cancelReason === 'Other' && (
-                    <div>
-                      <div style={{ fontSize: '12px', fontWeight: 500, marginBottom: 4 }}>Specify Reason</div>
-                      <Input.TextArea
-                        rows={2}
-                        placeholder="Type your custom reason here..."
-                        value={customCancelReason}
-                        onChange={(e) => setCustomCancelReason(e.target.value)}
-                        style={{ borderRadius: 4 }}
-                      />
-                    </div>
-                  )}
-
-                  <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-                    <Button
-                      size="small"
-                      style={{ flex: 1, borderRadius: 4 }}
-                      onClick={() => setActiveCancelLineId(null)}
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      danger
-                      type="primary"
-                      size="small"
-                      style={{ flex: 2, borderRadius: 4 }}
-                      disabled={!cancelReason || (cancelReason === 'Other' && !customCancelReason.trim())}
-                      onClick={() => handleCancelLine(line.lineId, line.b3Quantity)}
-                    >
-                      Confirm Cancel
-                    </Button>
-                  </div>
-                </Space>
-              }
-            >
-              <Tooltip title="Cancel Line">
+        render: (_: any, row: ApiAllocationRow) => {
+          const line = row.allocation;
+          return (
+            <Space>
+              <Tooltip title="Approve Line">
                 <Button
                   type="text"
-                  danger
-                  icon={<X size={18} />}
+                  className="action-btn-approve"
+                  icon={<Check size={18} color="var(--success-color)" />}
+                  onClick={() => handleApproveLine(line.lineId, line.b3Quantity)}
                 />
               </Tooltip>
-            </Popover>
-          </Space>
-        )
+
+              <Popover
+                title="Cancel Line"
+                trigger="click"
+                open={activeCancelLineId === line.lineId}
+                onOpenChange={(visible) => {
+                  if (visible) {
+                    setActiveCancelLineId(line.lineId);
+                    setCancelReason('');
+                    setCustomCancelReason('');
+                  } else {
+                    setActiveCancelLineId(null);
+                  }
+                }}
+                content={
+                  <Space direction="vertical" size={12} style={{ width: 260, padding: '4px 0' }}>
+                    <div>
+                      <div style={{ fontSize: '12px', fontWeight: 500, marginBottom: 4 }}>
+                        Cancel Qty
+                      </div>
+                      <InputNumber
+                        min={1}
+                        max={line.b3Quantity}
+                        value={line.b3Quantity}
+                        disabled
+                        style={{ width: '100%', borderRadius: 4, backgroundColor: '#f5f5f5' }}
+                      />
+                      <div style={{ fontSize: '11px', color: 'var(--text-secondary, #8c8c8c)', marginTop: 2 }}>
+                        Will cancel full quantity: {line.b3Quantity}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div style={{ fontSize: '12px', fontWeight: 500, marginBottom: 4 }}>
+                        Reason <span style={{ color: '#ff4d4f' }}>*</span>
+                      </div>
+                      <Select
+                        placeholder="Select reason..."
+                        value={cancelReason || undefined}
+                        onChange={(val) => setCancelReason(val)}
+                        style={{ width: '100%' }}
+                      >
+                        <Option value="Forecast correction">Forecast correction</Option>
+                        <Option value="Quality hold">Incorrect Entries</Option>
+                        <Option value="Other">Other</Option>
+                      </Select>
+                    </div>
+
+                    {cancelReason === 'Other' && (
+                      <div>
+                        <div style={{ fontSize: '12px', fontWeight: 500, marginBottom: 4 }}>Specify Reason</div>
+                        <Input.TextArea
+                          rows={2}
+                          placeholder="Type your custom reason here..."
+                          value={customCancelReason}
+                          onChange={(e) => setCustomCancelReason(e.target.value)}
+                          style={{ borderRadius: 4 }}
+                        />
+                      </div>
+                    )}
+
+                    <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                      <Button
+                        size="small"
+                        style={{ flex: 1, borderRadius: 4 }}
+                        onClick={() => setActiveCancelLineId(null)}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        danger
+                        type="primary"
+                        size="small"
+                        style={{ flex: 2, borderRadius: 4 }}
+                        disabled={!cancelReason || (cancelReason === 'Other' && !customCancelReason.trim())}
+                        onClick={() => handleCancelLine(line.lineId, line.b3Quantity)}
+                      >
+                        Confirm Cancel
+                      </Button>
+                    </div>
+                  </Space>
+                }
+              >
+                <Tooltip title="Cancel Line">
+                  <Button
+                    type="text"
+                    danger
+                    icon={<X size={18} />}
+                  />
+                </Tooltip>
+              </Popover>
+            </Space>
+          );
+        }
       }
     ];
 
@@ -573,6 +591,15 @@ export const Approvals = () => {
           enableSearch={false}
           pagination={false}
           size="small"
+          rowKey={(row: ApiAllocationRow) => row.allocation.lineId}
+          expandable={{
+            expandedRowRender: (row: ApiAllocationRow) => (
+              <div style={{ padding: '4px 0 8px 48px' }}>
+                <MetricsRow metrics={row.metrics} />
+              </div>
+            ),
+            rowExpandable: () => true,     // Forces all items to render metrics under them
+          }}
         />
       </Card>
     );
@@ -591,7 +618,15 @@ export const Approvals = () => {
       </div>
 
       {parentHeaders.length === 0 ? (
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: "60vh" }}><Loader isText={false} /></div>
+        /* Polished Minimal Empty State Box Layout */
+        <div className="empty-approvals-box">
+          <Space direction="vertical" align="center" size="middle">
+            <UserCheck size={40} style={{ color: 'var(--text-quaternary)', opacity: 0.4 }} />
+            <Text type="secondary" strong style={{ fontSize: 15, letterSpacing: '0.02em' }}>
+              No Approval Pending
+            </Text>
+          </Space>
+        </div>
       ) : (
         <DynamicGrid
           columns={parentColumns}
@@ -601,7 +636,6 @@ export const Approvals = () => {
             expandedRowRender: renderExpandedRow,
             rowExpandable: () => true
           }}
-          loading={loading}
         />
       )}
     </div>

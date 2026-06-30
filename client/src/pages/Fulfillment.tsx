@@ -10,6 +10,7 @@ import { FilterHeader } from '../components/FilterHeader';
 import { Loader } from '../components/Loader';
 import { useLoader } from '../hooks/useLoader';
 import { useAuth } from '../context/AuthContext';
+import FulfillmentTracker from './TrackerPage';
 
 const { Option } = Select;
 
@@ -18,6 +19,7 @@ const { Title, Text } = Typography;
 interface HeaderRecord {
   headerId: number;
   transactionDate: string;
+  customerId: number | null;
   customerName: string | null;
   customerRegion: string | null;
   createdBy: string;
@@ -29,6 +31,7 @@ interface HeaderRecord {
   cancelledLines: number;
   lines: AllocationRow[];
 }
+
 
 export const Fulfillment: React.FC = () => {
   const navigate = useNavigate();
@@ -64,6 +67,7 @@ export const Fulfillment: React.FC = () => {
           headerId: item.headerId,
           transactionDate: item.transactionDate,
           customerName: item.customerName ?? null,
+          customerId: item.customerId,
           customerRegion: item.customerRegion ?? null,
           createdBy: item.createdBy,
           totalLines: 0,
@@ -103,7 +107,7 @@ export const Fulfillment: React.FC = () => {
       case 'CANCELLED':
         return headerData.filter((header) => header.cancelledLines > 0);
       case 'OPEN_POOL':
-        return headerData.filter((header) => header.lines.some((line) => line.customerOrItemSpecific === 0));
+        return headerData.filter((header) => header.customerId === 0);
       case 'CUSTOMER':
         return headerData.filter((header) => header.customerName !== null);
       default:
@@ -233,19 +237,19 @@ export const Fulfillment: React.FC = () => {
       render: (date: string) => new Date(date).toLocaleDateString(),
       sorter: (a, b) => new Date(a.transactionDate).getTime() - new Date(b.transactionDate).getTime()
     },
-    {
-      title: 'Action',
-      key: 'action',
-      render: (_: any, record: HeaderRecord) => (
-        <Button
-          type="link"
-          onClick={() => navigate(`/info-page/${record.headerId}`)}
-          style={{ padding: 0 }}
-        >
-          View
-        </Button>
-      )
-    }
+    // {
+    //   title: 'Action',
+    //   key: 'action',
+    //   render: (_: any, record: HeaderRecord) => (
+    //     <Button
+    //     type="link"
+    //     onClick={() => navigate(`/info-page/${record.headerId}`)}
+    //     style={{ padding: 0 }}
+    //     >
+    //       View
+    //     </Button>
+    //   )
+    // }
   ];
 
   // ─── LINE COLUMNS (labels only, no IDs) ───
@@ -391,12 +395,8 @@ export const Fulfillment: React.FC = () => {
                     style={{ width: '100%' }}
                     dropdownStyle={{ minWidth: 240 }}
                   >
-                    <Option value="Production schedule revised">Production schedule revised</Option>
-                    <Option value="Customer request reduction">Customer request reduction</Option>
                     <Option value="Forecast correction">Forecast correction</Option>
-                    <Option value="Raw material constraint">Raw material constraint</Option>
-                    <Option value="Order cancellation by customer">Order cancellation by customer</Option>
-                    <Option value="Quality hold">Quality hold</Option>
+                    <Option value="Quality hold">Incorrect Entries</Option>
                     <Option value="Other">Other</Option>
                   </Select>
                 </div>
@@ -506,6 +506,10 @@ export const Fulfillment: React.FC = () => {
           }}
         />
       }
+
+      <div>
+        <FulfillmentTracker />
+      </div>
     </div>
   );
 };

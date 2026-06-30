@@ -23,16 +23,16 @@ public sealed class AllocationService(IDynamicQueryExecutor dynamicQuery) : IAll
             Queries.GetAllRegionDetails,
             cancellationToken: cancellationToken);
 
-    public Task<IEnumerable<CustomerDto>> GetBillToCustomersAsync(string region, string subRegion, CancellationToken cancellationToken = default)
+    public Task<IEnumerable<CustomerDto>> GetBillToCustomersAsync(string region, string subRegion, int orgId, CancellationToken cancellationToken = default)
         => _queryExecutor.QueryAsync<CustomerDto>(
             Queries.GetBillToCustomersByRegion,
-            new { Region = region, SubRegion = subRegion },
+            new { Region = region, SubRegion = subRegion, ORG_ID = orgId },
             cancellationToken: cancellationToken);
 
-    public Task<IEnumerable<CustomerDto>> GetShipToCustomersAsync(string region, string subRegion, CancellationToken cancellationToken = default)
-        => _queryExecutor.QueryAsync<CustomerDto>(
+    public Task<IEnumerable<ShipToCustomerDto>> GetShipToCustomersAsync(int orgId, int customerId, CancellationToken cancellationToken = default)
+        => _queryExecutor.QueryAsync<ShipToCustomerDto>(
             Queries.GetShipToCustomersByRegion,
-            new { Region = region, SubRegion = subRegion },
+            new { ORG_ID = orgId, CUSTOMER_ID = customerId },
             cancellationToken: cancellationToken);
 
     public Task<IEnumerable<EmployeeDto>> GetPreparedByEmployeesAsync(string region, CancellationToken cancellationToken = default)
@@ -61,6 +61,13 @@ public sealed class AllocationService(IDynamicQueryExecutor dynamicQuery) : IAll
         => _queryExecutor.QueryAsync<OrganizationDto>(
             Queries.GetInventoryOrganizations,
             cancellationToken: cancellationToken);
+    public Task<IEnumerable<OrganizationDto>> GetInventoryOrganizationsByOuIdAsync(
+        int ouId,
+        CancellationToken cancellationToken = default)
+        => _queryExecutor.QueryAsync<OrganizationDto>(
+            Queries.GetInventoryOrganizationsByOuId,
+            new { OuId = ouId });
+
 
     public async Task<PagedResult<InventoryItemDto>> GetInventoryItemDetailsAsync(
         int page, int pageSize, string? search, int? orgId, CancellationToken cancellationToken = default)

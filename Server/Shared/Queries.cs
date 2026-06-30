@@ -27,34 +27,54 @@ public static class Queries
     /// <summary>
     /// Fetches unique customer IDs, names, and regions configured with a 'BILL_TO' site use code filtered by UI parameters.
     /// </summary>
+    //public const string GetBillToCustomersByRegion = @"
+    //        SELECT DISTINCT customer_id AS CustomerId, customer_name AS CustomerName, REGION AS Region 
+    //        FROM (
+    //            SELECT ra.customer_id, ra.customer_name,
+    //                   (SELECT segment14 FROM ra_territories WHERE territory_id = ras.territory_id) AS REGION 
+    //            FROM ra_customers ra
+    //            JOIN ra_addresses_all ad ON ra.customer_id = ad.customer_id
+    //            JOIN ra_site_uses_all ras ON ad.address_id = ras.address_id
+    //            WHERE ras.site_use_code = 'BILL_TO'
+    //        ) 
+    //        WHERE REGION = :Region OR REGION = :SubRegion
+    //        ORDER BY customer_name ASC";
     public const string GetBillToCustomersByRegion = @"
-            SELECT DISTINCT customer_id AS CustomerId, customer_name AS CustomerName, REGION AS Region 
+            SELECT DISTINCT 
+                customer_id,
+                customer_name,
+                REGION,
+                ORG_ID 
             FROM (
-                SELECT ra.customer_id, ra.customer_name,
-                       (SELECT segment14 FROM ra_territories WHERE territory_id = ras.territory_id) AS REGION 
+                SELECT 
+                    ra.customer_id, 
+                    ra.customer_name,
+                    ad.org_id,
+                    (SELECT segment14 FROM ra_territories WHERE territory_id = ras.territory_id) AS REGION 
                 FROM ra_customers ra
                 JOIN ra_addresses_all ad ON ra.customer_id = ad.customer_id
                 JOIN ra_site_uses_all ras ON ad.address_id = ras.address_id
                 WHERE ras.site_use_code = 'BILL_TO'
             ) 
-            WHERE REGION = :Region OR REGION = :SubRegion
+            WHERE org_id = :ORG_ID
+              AND (REGION = :Region OR REGION = :SubRegion)
             ORDER BY customer_name ASC";
 
     /// <summary>
     /// Fetches unique customer IDs, names, and regions configured with a 'SHIP_TO' site use code filtered by UI parameters.
     /// </summary>
     public const string GetShipToCustomersByRegion = @"
-            SELECT DISTINCT customer_id AS CustomerId, customer_name AS CustomerName, REGION AS Region 
-            FROM (
-                SELECT ra.customer_id, ra.customer_name,
-                       (SELECT segment14 FROM ra_territories WHERE territory_id = ras.territory_id) AS REGION 
-                FROM ra_customers ra
-                JOIN ra_addresses_all ad ON ra.customer_id = ad.customer_id
-                JOIN ra_site_uses_all ras ON ad.address_id = ras.address_id
-                WHERE ras.site_use_code = 'SHIP_TO'
-            ) 
-            WHERE REGION = :Region OR REGION = :SubRegion
-            ORDER BY customer_name ASC";
+            SELECT 
+                b.related_cust_account_id AS ""customer_id"",
+                rel.customer_name AS ""customer_name""
+            FROM apps.hz_cust_acct_relate_all b
+            JOIN ra_customers a ON a.customer_id = b.cust_account_id
+            LEFT JOIN ra_customers src ON src.customer_id = b.cust_account_id
+            LEFT JOIN ra_customers rel ON rel.customer_id = b.related_cust_account_id
+            WHERE b.cust_account_id = :CUSTOMER_ID 
+              AND b.org_id = :ORG_ID
+              AND b.status = 'A'
+            ORDER BY rel.customer_name ASC";
 
     /// <summary>
     /// Retrieves a list of prepared employee names and numbers based on specific management levels within a dynamic region.
@@ -98,10 +118,17 @@ public static class Queries
     /// Maps to: /api/Allocation/operating-units
     /// </summary>
     public const string GetOperatingUnitDetails = @"
-            SELECT ORGANIZATION_ID AS ""OrganizationId"", NAME AS ""Name"" 
-            FROM hr_operating_units 
-            WHERE ORGANIZATION_ID IN (103, 704, 844)
-            ORDER BY ""Name"" ASC";
+        SELECT 
+            ORGANIZATION_ID AS ""OrganizationId"", 
+            CASE     
+                WHEN ORGANIZATION_ID = 103 THEN 'JIPL'     
+                WHEN ORGANIZATION_ID = 844 THEN 'JGSPL'   
+                WHEN ORGANIZATION_ID = 704 THEN 'JP'   
+                ELSE 'NA' 
+            END AS ""Name""
+        FROM hr_operating_units 
+        WHERE ORGANIZATION_ID IN (103, 704, 844)
+        ORDER BY NAME ASC";
 
     /// <summary>
     /// Retrieves specific inventory organization definitions.
@@ -111,6 +138,13 @@ public static class Queries
             FROM ORG_ORGANIZATION_DEFINITIONS 
             WHERE OPERATING_UNIT IN (103,704,844)
               AND ORGANIZATION_ID IN (904,924,110,111,304,384,524,464,444,504,484,505,644,804,1025,724)";
+
+    public const string GetInventoryOrganizationsByOuId = @"
+            SELECT ORGANIZATION_ID AS ""OrganizationId"", ORGANIZATION_CODE AS ""OrganizationCode"" 
+            FROM ORG_ORGANIZATION_DEFINITIONS 
+            WHERE OPERATING_UNIT = :OuId
+              AND ORGANIZATION_ID IN (904,924,110,111,304,384,524,464,444,504,484,505,644,804,1025,724)
+            ORDER BY ORGANIZATION_CODE ASC";
 
     /// <summary>
     /// Retrieves inventory item ID based on the Segment1 item code.
@@ -426,6 +460,74 @@ public static class Queries
         LEFT JOIN ra_customers cust_bill ON h.BILL_TO_CUSTOMER = cust_bill.customer_id
         LEFT JOIN ra_customers cust_ship ON h.SHIP_TO_CUSTOMER = cust_ship.customer_id";
 
+    public const string GetPendingAllocationsGroupedById = @"
+    SELECT 
+        h.BILL_TO_CUSTOMER AS BillToCustomerId,
+        TRIM(cust_bill.customer_name) AS BillToCustomerName,
+        h.SHIP_TO_CUSTOMER AS ShipToCustomerId,
+        TRIM(cust_ship.customer_name) AS ShipToCustomerName,
+        h.CUSTOMER_ID AS CustomerId,
+        TRIM(cust_pri.customer_name) AS CustomerName,
+        h.HEADER_ID AS HeaderId,
+        TRIM(h.CUSTOMER_OR_ITEM_SPECIFIC) AS CustomerOrItemSpecific,
+        h.TERRITORY_ID AS TerritoryId,
+        TRIM(h.REMARKS) AS Remarks,
+        TO_CHAR(h.TRANSACTION_DATE, 'YYYY-MM-DD') AS TransactionDate,
+        TRIM(h.CREATED_BY) AS CreatedBy,
+        TO_CHAR(h.CREATED_DATE, 'YYYY-MM-DD') AS CreatedDate,
+        TRIM(h.UPDATED_BY) AS UpdatedBy,
+        TO_CHAR(h.UPDATED_DATE, 'YYYY-MM-DD') AS UpdatedDate,
+        h.header_code As HeaderCode,
+
+        l.LineId,
+        l.ApprovalFlag,
+        l.B3ApprovedQuantity,
+        l.B3Quantity,
+        l.OldRequestedQty,
+        l.InventoryItemId,
+        l.OrganizationId,
+        l.OrganizationCode,
+        l.ItemCode,
+        l.ItemDescription,
+        l.TargetDate,
+        l.ClosureFlag,
+        l.Revision,
+        l.ParentLineId
+    FROM JAN_B3_HEADER h
+    LEFT JOIN (
+        SELECT 
+            lines.LINE_ID AS LineId,
+            lines.HEADER_ID,
+            TRIM(lines.APPROVAL_FLAG) AS ApprovalFlag,
+            lines.B3_APPROVED_QUANTITY AS B3ApprovedQuantity,
+            lines.B3_QUANTITY AS B3Quantity,
+            lines.INVENTORY_ITEM_ID AS InventoryItemId,
+            lines.ORGANIZATION_ID AS OrganizationId,
+            TRIM(org.ORGANIZATION_CODE) AS OrganizationCode,
+            TRIM(itm.SEGMENT1) AS ItemCode,
+            TRIM(itm.DESCRIPTION) AS ItemDescription,
+            TO_CHAR(lines.TARGET_DATE, 'YYYY-MM-DD') AS TargetDate,
+            TRIM(lines.CLOSURE_FLAG) AS ClosureFlag,
+            lines.REVISION AS Revision,
+            lines.PARENT_LINE_ID AS ParentLineId,
+            LAG(lines.B3_QUANTITY, 1) OVER (
+                PARTITION BY lines.HEADER_ID, COALESCE(lines.PARENT_LINE_ID, lines.LINE_ID) 
+                ORDER BY lines.REVISION ASC, lines.LINE_ID ASC
+            ) AS OldRequestedQty,
+            ROW_NUMBER() OVER (
+                PARTITION BY lines.HEADER_ID, COALESCE(lines.PARENT_LINE_ID, lines.LINE_ID) 
+                ORDER BY lines.REVISION DESC, lines.LINE_ID DESC
+            ) AS rn
+        FROM JAN_B3_LINES lines
+        LEFT JOIN ORG_ORGANIZATION_DEFINITIONS org ON lines.ORGANIZATION_ID = org.ORGANIZATION_ID
+        LEFT JOIN MTL_SYSTEM_ITEMS itm ON lines.INVENTORY_ITEM_ID = itm.INVENTORY_ITEM_ID 
+                                      AND lines.ORGANIZATION_ID = itm.ORGANIZATION_ID
+    ) l ON h.HEADER_ID = l.HEADER_ID AND l.rn = 1
+    LEFT JOIN ra_customers cust_pri ON h.CUSTOMER_ID = cust_pri.customer_id
+    LEFT JOIN ra_customers cust_bill ON h.BILL_TO_CUSTOMER = cust_bill.customer_id
+    LEFT JOIN ra_customers cust_ship ON h.SHIP_TO_CUSTOMER = cust_ship.customer_id
+    WHERE l.ApprovalFlag = 'N'";
+
     public const string AmendAllocationLine = @"
             UPDATE JAN_B3_LINES 
             SET APPROVAL_FLAG = 'A', B3_QUANTITY = :NEW_QTY, APPROVED_DATE = SYSDATE 
@@ -451,11 +553,11 @@ public static class Queries
     /// Retrieves full details for a specific inventory item using its unique Inventory Item ID.
     /// </summary>
     public const string GetInventoryItemById = @"
-                SELECT DISTINCT INVENTORY_ITEM_ID AS ""InventoryItemId"", 
-                       TRIM(REPLACE(SEGMENT1 AS ""ItemCode"")), 
-                       TRIM(REPLACE(DESCRIPTION, '""', '')) AS ""Description""
-                FROM MTL_SYSTEM_ITEMS
-                WHERE INVENTORY_ITEM_ID = :InventoryItemId";
+        SELECT DISTINCT INVENTORY_ITEM_ID AS ""InventoryItemId"",
+        TRIM(REPLACE(SEGMENT1, '""', '')) AS ""ItemCode"",
+        TRIM(REPLACE(DESCRIPTION, '""', '')) AS ""Description""
+        FROM MTL_SYSTEM_ITEMS
+        WHERE INVENTORY_ITEM_ID = :InventoryItemId";
 
     /// <summary>
     /// Retrieves a customer's name and region details using their unique Customer ID.

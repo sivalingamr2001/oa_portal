@@ -1,6 +1,5 @@
 import { ConfigProvider } from 'antd';
 import React from 'react';
-import './App.css';
 import { NotificationProvider } from './context/NotificationContext';
 import Router from './router';
 import { ConfigureAntTheme } from './theme/antTheme';

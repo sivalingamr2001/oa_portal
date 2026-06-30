@@ -8,7 +8,7 @@ using System.Data;
 
 namespace Backend.Services
 {
-    public class BinAllocationService(OracleService oracleService) : IBinAllocationService
+    public class BinAllocationService(OracleService oracleService, IAllocationService allocation) : IBinAllocationService
     {
         private readonly string _connectionString = oracleService.GetConnectionString()
                 ?? throw new InvalidOperationException("OracleDb connection string missing.");
@@ -283,10 +283,37 @@ namespace Backend.Services
             return headerDto;
         }
 
-        public async Task<IEnumerable<B3Line>> GetPendingApprovalLinesAsync()
+        // 1. Matches your interface name exactly to fix 'does not implement interface member'
+        public async Task<IEnumerable<B3LineWithMetricsDto>> GetPendingApprovalLinesAsync(CancellationToken cancellationToken = default)
         {
             using var conn = CreateConnection();
-            return await conn.QueryAsync<B3Line>(QueriesV2.GetPendingApprovalLines);
+
+            var pendRows = await conn.QueryAsync<AllocationRow>(
+                Queries.GetPendingAllocationsGroupedById
+            );
+
+            if (pendRows == null || !pendRows.Any())
+            {
+                return Enumerable.Empty<B3LineWithMetricsDto>();
+            }
+
+            var metricTasks = pendRows.Select(async line =>
+            {
+                int intCustomerId = line.CustomerId.HasValue ? Convert.ToInt32(line.CustomerId.Value) : 0;
+                int intOrganizationId = line.OrganizationId.HasValue ? Convert.ToInt32(line.OrganizationId.Value) : 0;
+                int intInventoryItemId = Convert.ToInt32(line.InventoryItemId);
+
+                var metrics = await allocation.GetDemandMetricsAsync(intCustomerId, intOrganizationId, intInventoryItemId, cancellationToken);
+
+                return new B3LineWithMetricsDto
+                {
+                    Allocation = line,
+                    // If metrics comes back null, instantiate a fresh zeroed-out DTO object
+                    Metrics = metrics ?? new DemandMetricsDto()
+                };
+            });
+
+            return await Task.WhenAll(metricTasks);
         }
 
         public async Task<IEnumerable<B3Cancellation>> GetAllCancellationsAsync()

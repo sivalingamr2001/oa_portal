@@ -1,49 +1,48 @@
-import { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
-  Collapse,
-  Card,
-  Form,
-  Row,
-  Col,
-  Select,
-  Input,
+  Alert,
   Button,
+  Card,
+  Col,
+  Collapse,
   DatePicker,
+  Divider,
+  Form,
+  Input,
+  message,
+  Modal,
+  Radio,
+  Row,
+  Select,
   Space,
   Tag,
-  Alert,
-  Divider,
-  Typography,
-  message,
-  Radio,
-  Modal
+  Typography
 } from 'antd';
-import { Plus, Trash2, Save, FileText, MapPin, Database, Sparkles } from 'lucide-react';
-import {
-  getRegions,
-  getBillToCustomers,
-  getShipToCustomers,
-  getCustomerAddresses,
-  getWeeksDropdown,
-  getOperatingUnits,
-  getDemandMetrics,
-  getOrganizations,
-  getItems,
-  getRrsCategory,
-  createAllocation
-} from '../api/allocationApi';
+import { Database, FileText, MapPin, Plus, Save, Sparkles, Trash2, X } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type {
-  Region,
   Customer,
   CustomerAddress,
+  InventoryItem,
   OperatingUnit,
   Organization,
-  InventoryItem
+  Region
 } from '../api/allocationApi';
+import {
+  createAllocation,
+  getBillToCustomers,
+  getCustomerAddresses,
+  getDemandMetrics,
+  getItems,
+  getOperatingUnits,
+  getOrganizationsByOuId,
+  getRegions,
+  getRrsCategory,
+  getShipToCustomers
+} from '../api/allocationApi';
+import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
 import '../styles/Allocations.css';
-import { useAuth } from '../context/AuthContext';
 
 const { Title, Text } = Typography;
 const { Panel } = Collapse;
@@ -57,14 +56,13 @@ interface LineItemState {
   week: string;
   b3Quantity: number;
   targetDate: string;
-  // Dynamic API metrics & validations
   oaPendingQuantity?: number;
   oaRsvQty?: number;
   oaPickedQty?: number;
   binQty?: number;
   binRsvQty?: number;
   rrsCategory?: string;
-  rrsWarning?: boolean;
+  rrsError?: boolean;
 }
 
 export const Allocations = () => {
@@ -79,57 +77,40 @@ export const Allocations = () => {
     }
   }, [currentRegion]);
 
-  // Dropdown options
   const [regions, setRegions] = useState<Region[]>([]);
   const [operatingUnits, setOperatingUnits] = useState<OperatingUnit[]>([]);
   const [billToCustomers, setBillToCustomers] = useState<Customer[]>([]);
   const [shipToCustomers, setShipToCustomers] = useState<Customer[]>([]);
   const [billToAddresses, setBillToAddresses] = useState<CustomerAddress[]>([]);
   const [shipToAddresses, setShipToAddresses] = useState<CustomerAddress[]>([]);
-
-  // Shared line options
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [items, setItems] = useState<InventoryItem[]>([]);
-  const [weeks, setWeeks] = useState<string[]>([]);
-
-  // Selection states
   const [selectedRegion, setSelectedRegion] = useState<string>('');
   const [selectedSubRegion, setSelectedSubRegion] = useState<string>('');
   const [selectedOU, setSelectedOU] = useState<number | null>(null);
   const [selectedBillToCustomer, setSelectedBillToCustomer] = useState<number | null>(null);
   const [selectedShipToCustomer, setSelectedShipToCustomer] = useState<number | null>(null);
-
-  // Address details displays
+  const [loadingShipToCustomers, setLoadingShipToCustomers] = useState(false);
   const [billToAddressDetail, setBillToAddressDetail] = useState<string>('');
   const [shipToAddressDetail, setShipToAddressDetail] = useState<string>('');
-
   const [searchTerm, setSearchTerm] = useState<string>('');
-  const [selectedCustomerOrItemSpecific, setSelectedCustomerOrItemSpecific] = useState(0);
-
-  // Lines state
   const [lines, setLines] = useState<LineItemState[]>([
     { id: '1', organizationId: null, inventoryItemId: null, itemCode: '', description: '', week: '', b3Quantity: 0, targetDate: '' }
   ]);
-
   const [loading, setLoading] = useState(false);
   const [activePanel, setActivePanel] = useState<string | string[]>(['header']);
 
-  // Fetch initial dropdowns
   useEffect(() => {
     const loadInitialData = async () => {
       try {
-        const [regionsData, ouData, orgData, itemsData, weeksData] = await Promise.all([
+        const [regionsData, ouData, itemsData] = await Promise.all([
           getRegions(),
           getOperatingUnits(),
-          getOrganizations(),
           getItems(1, 50, searchTerm, lines.find(l => l.organizationId)?.organizationId || undefined),
-          getWeeksDropdown()
         ]);
         setRegions(regionsData);
         setOperatingUnits(ouData);
-        setOrganizations(orgData);
         setItems(itemsData.data);
-        setWeeks(weeksData);
       } catch (err) {
         message.error('Failed to load form lookup data.');
       }
@@ -137,35 +118,40 @@ export const Allocations = () => {
     loadInitialData();
   }, [searchTerm]);
 
-  // Compute unique regions list
+  useEffect(() => {
+    if (!selectedOU) {
+      setOrganizations([]);
+      return;
+    }
+    const loadOrganizations = async () => {
+      try {
+        const orgs = await getOrganizationsByOuId(selectedOU);
+        setOrganizations(orgs);
+      } catch (err) {
+        message.error('Failed to load organizations for selected operating unit.');
+      }
+    };
+    loadOrganizations();
+  }, [selectedOU]);
+
   const uniqueRegions = useMemo(() => {
     return Array.from(new Set(regions.map(r => r.region)));
   }, [regions]);
 
-  // Compute sub-regions matching the selected region
   const subRegions = useMemo(() => {
     if (!selectedRegion) return [];
-
     return regions
       .filter(r => r.region === selectedRegion)
       .flatMap(r => r.subRegion ? r.subRegion.split(',') : [])
-      .map(item => item.trim()); // Cleans up any accidental whitespace
+      .map(item => item.trim());
   }, [regions, selectedRegion]);
 
-  // Fetch Customers when Region and Sub-Region are selected
   useEffect(() => {
     if (!selectedRegion || !selectedSubRegion) return;
-
-    const loadRegionalData = async () => {
+    const loadBillToCustomers = async () => {
       try {
-        const [billTo, shipTo] = await Promise.all([
-          getBillToCustomers(selectedRegion, selectedSubRegion),
-          getShipToCustomers(selectedRegion, selectedSubRegion)
-        ]);
+        const billTo = await getBillToCustomers(selectedRegion, selectedSubRegion, selectedOU);
         setBillToCustomers(billTo);
-        setShipToCustomers(shipTo);
-
-        // Reset customer dependencies
         form.setFieldsValue({ billToCustomer: null, shipToCustomer: null });
         setSelectedBillToCustomer(null);
         setSelectedShipToCustomer(null);
@@ -173,14 +159,31 @@ export const Allocations = () => {
         setShipToAddresses([]);
         setBillToAddressDetail('');
         setShipToAddressDetail('');
+        setShipToCustomers([]);
       } catch (err) {
         message.error('Failed to fetch customers for selected region.');
       }
     };
-    loadRegionalData();
-  }, [selectedRegion, selectedSubRegion]);
+    loadBillToCustomers();
+  }, [selectedRegion, selectedSubRegion, selectedOU]);
 
-  // Fetch Bill-to Addresses
+  const loadShipToCustomers = async () => {
+    try {
+      const shipTo = await getShipToCustomers(selectedOU, selectedBillToCustomer);
+      setShipToCustomers(shipTo);
+    } catch (err) {
+      message.error('Failed to fetch ship-to customers.');
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedOU || !selectedBillToCustomer) {
+      setShipToCustomers([]);
+      return;
+    }
+    loadShipToCustomers();
+  }, [selectedOU, selectedBillToCustomer]);
+
   useEffect(() => {
     if (!selectedBillToCustomer || !selectedOU) return;
     const fetchBillToAddresses = async () => {
@@ -196,7 +199,6 @@ export const Allocations = () => {
     fetchBillToAddresses();
   }, [selectedBillToCustomer, selectedOU]);
 
-  // Fetch Ship-to Addresses
   useEffect(() => {
     if (!selectedShipToCustomer || !selectedOU) return;
     const fetchShipToAddresses = async () => {
@@ -212,7 +214,6 @@ export const Allocations = () => {
     fetchShipToAddresses();
   }, [selectedShipToCustomer, selectedOU]);
 
-  // Handle address location dropdown selection
   const handleBillToLocationSelect = (locName: string) => {
     const address = billToAddresses.find(a => a.location === locName);
     if (address) {
@@ -227,7 +228,6 @@ export const Allocations = () => {
     }
   };
 
-  // Add/Remove lines
   const addLineRow = () => {
     const newId = (lines.length + 1).toString();
     setLines([...lines, { id: newId, organizationId: null, inventoryItemId: null, itemCode: '', description: '', week: '', b3Quantity: 0, targetDate: '' }]);
@@ -241,14 +241,50 @@ export const Allocations = () => {
     setLines(lines.filter(l => l.id !== id));
   };
 
-  // Modify line property
+  const handleClearAll = () => {
+    Modal.confirm({
+      title: 'Clear All Fields',
+      content: 'Are you sure you want to clear all fields and reset the form?',
+      okText: 'Clear',
+      okType: 'danger',
+      cancelText: 'Cancel',
+      onOk: () => {
+        form.resetFields();
+        form.setFieldsValue({ optionType: 'Customer Specific' });
+        setSelectedRegion(currentRegion?.region || '');
+        setSelectedSubRegion('');
+        setSelectedOU(null);
+        setSelectedBillToCustomer(null);
+        setSelectedShipToCustomer(null);
+        setBillToAddressDetail('');
+        setShipToAddressDetail('');
+        setBillToAddresses([]);
+        setShipToAddresses([]);
+        setBillToCustomers([]);
+        setShipToCustomers([]);
+        setLines([
+          { id: '1', organizationId: null, inventoryItemId: null, itemCode: '', description: '', week: '', b3Quantity: 0, targetDate: '' }
+        ]);
+        setSearchTerm('');
+        message.success('All fields have been cleared.');
+      }
+    });
+  };
+
+  const clearLine = (id: string) => {
+    setLines(prevLines =>
+      prevLines.map(line =>
+        line.id === id
+          ? { id: line.id, organizationId: null, inventoryItemId: null, itemCode: '', description: '', week: '', b3Quantity: 0, targetDate: '' }
+          : line
+      )
+    );
+  };
+
   const updateLineRow = async (id: string, field: keyof LineItemState, value: any) => {
     const updated = await Promise.all(lines.map(async (line) => {
       if (line.id !== id) return line;
-
       const updatedLine = { ...line, [field]: value } as LineItemState;
-
-      // Handle item auto-fills and metric fetches
       if (field === 'inventoryItemId') {
         const itemObj = items.find(i => i.inventoryItemId === value);
         if (itemObj) {
@@ -256,21 +292,16 @@ export const Allocations = () => {
           updatedLine.description = itemObj.description;
         }
       }
-
-      // Check validations and demand metrics if item & org are selected
       if (
         (field === 'inventoryItemId' || field === 'organizationId') &&
         updatedLine.inventoryItemId &&
         updatedLine.organizationId
       ) {
         try {
-          // 1. Check RRS Category
           const rrs = await getRrsCategory(updatedLine.organizationId, updatedLine.inventoryItemId);
           updatedLine.rrsCategory = rrs.rrsCategory;
-          updatedLine.rrsWarning = rrs.rrsCategory === 'Rn';
-
-          // 2. Fetch Demand Metrics
-          if (selectedBillToCustomer) {
+          updatedLine.rrsError = rrs.rrsCategory === 'Rn';
+          if (selectedBillToCustomer && !updatedLine.rrsError) {
             const metrics = await getDemandMetrics(
               selectedBillToCustomer,
               updatedLine.organizationId,
@@ -282,55 +313,48 @@ export const Allocations = () => {
             updatedLine.binQty = metrics.binQty;
             updatedLine.binRsvQty = metrics.binRsvQty;
           }
+          if (updatedLine.rrsError) {
+            updatedLine.oaPendingQuantity = undefined;
+            updatedLine.oaRsvQty = undefined;
+            updatedLine.oaPickedQty = undefined;
+            updatedLine.binQty = undefined;
+            updatedLine.binRsvQty = undefined;
+          }
         } catch (err) {
           console.error('Failed to retrieve item metrics:', err);
         }
       }
-
       return updatedLine;
     }));
-
     setLines(updated);
   };
 
   const handleSave = async () => {
     try {
       const headerValues = await form.validateFields();
-
-      // Check if there are any lines
       if (lines.length === 0) {
         message.error('At least one line item is required.');
         return;
       }
-
-      // Validate lines
       for (const line of lines) {
-        if (!line.organizationId || !line.inventoryItemId || !line.week || line.b3Quantity <= 0 || !line.targetDate) {
+        if (!line.organizationId || !line.inventoryItemId || line.b3Quantity <= 0 || !line.targetDate) {
           message.error('Please fill in all line item details and ensure quantity is positive.');
           return;
         }
-        if (line.rrsWarning) {
-          message.error(`Cannot save: Item ${line.itemCode} has a restricted RRS Category ("Rn").`);
+        if (line.rrsError) {
+          message.error(`Cannot save: Item ${line.itemCode} has a restricted RRS Category ("Rn"). Please clear the line or select a different item.`);
           return;
         }
       }
-
       setLoading(true);
-
-      // 0 = Item Specific (Open Pool), 1 = Customer Specific
-      const isOpenPool = selectedCustomerOrItemSpecific === 0;
-
-      // Pass the region string only for open pool/item specific selections
-      const regionValue = isOpenPool ? (currentRegion?.region || null) : null;
-
       const requestPayload: any = {
-        transactionDate: new Date().toISOString().split('T')[0], // Fixed date array split
-        customerOrItemSpecific: selectedCustomerOrItemSpecific,
-        customerId: isOpenPool ? null : selectedBillToCustomer,
+        transactionDate: new Date().toISOString().split('T')[0],
+        customerOrItemSpecific: 1,
+        customerId: selectedBillToCustomer,
         territoryId: null,
-        region: regionValue,
-        billToCustomer: isOpenPool ? null : selectedBillToCustomer,
-        shipToCustomer: isOpenPool ? null : selectedShipToCustomer,
+        region: currentRegion?.region,
+        billToCustomer: selectedBillToCustomer,
+        shipToCustomer: selectedShipToCustomer,
         createdBy: currentUser?.username,
         remarks: headerValues.remarks,
         lines: lines.map(l => ({
@@ -340,7 +364,6 @@ export const Allocations = () => {
           targetDate: l.targetDate
         }))
       };
-
       const result = await createAllocation(requestPayload);
       addNotification(`Bin Allocation created successfully under Header ID: ${result.headerId}`, 'info');
       navigate('/');
@@ -355,7 +378,6 @@ export const Allocations = () => {
   const validateCustomersMatch = (changedField: string, incomingValue: any) => {
     const otherField = changedField === 'billToCustomer' ? 'shipToCustomer' : 'billToCustomer';
     const otherValue = form.getFieldValue(otherField);
-
     if (incomingValue && otherValue && incomingValue !== otherValue) {
       Modal.confirm({
         title: 'Different Customers Selected',
@@ -374,13 +396,24 @@ export const Allocations = () => {
   return (
     <div className="fulfillment-container">
       <div className="fulfillment-header">
-        <Space direction="vertical" size={2}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Sparkles size={24} style={{ color: 'var(--primary-color)' }} />
-            <Title level={2} style={{ margin: 0, color: 'var(--text-primary)' }}>Create B3 Input</Title>
-          </div>
-          <Text type="secondary">Define header details and add line item quantities below</Text>
-        </Space>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
+          <Space direction="vertical" size={2}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Sparkles size={24} style={{ color: 'var(--primary-color)' }} />
+              <Title level={2} style={{ margin: 0, color: 'var(--text-primary)' }}>Create B3 Input</Title>
+            </div>
+            <Text type="secondary">Define header details and add line item quantities below</Text>
+          </Space>
+          <Button
+            size='small'
+            danger
+            onClick={handleClearAll}
+            icon={<X size={16} />}
+            style={{ borderRadius: 8, marginTop: 10 }}
+          >
+            Clear All
+          </Button>
+        </div>
       </div>
 
       <Collapse
@@ -410,11 +443,6 @@ export const Allocations = () => {
                   <Radio.Group
                     onChange={(e) => {
                       const value = e.target.value;
-
-                      // Update your state tracking variable
-                      // Assuming 1 = Customer Specific, 0 = Item Specific (Open Pool)
-                      setSelectedCustomerOrItemSpecific(value === "Customer Specific" ? 1 : 0);
-
                       if (value === 'Item Specific') {
                         form.setFieldsValue({
                           operatingUnit: undefined,
@@ -434,14 +462,10 @@ export const Allocations = () => {
                 </Form.Item>
               </Col>
 
-              {/* Conditional rendering using Form.Item dependencies */}
               <Form.Item shouldUpdate={(prevValues, currentValues) => prevValues.optionType !== currentValues.optionType} noStyle>
                 {({ getFieldValue }) => {
                   const isItemSpecific = getFieldValue('optionType') === 'Item Specific';
-
-                  // When 'Item Specific' is selected, skip rendering the regions and cards
                   if (isItemSpecific) return null;
-
                   return (
                     <>
                       <Col xs={24} sm={12} md={8}>
@@ -519,6 +543,10 @@ export const Allocations = () => {
                               disabled={!selectedSubRegion}
                               onChange={(val) => {
                                 setSelectedBillToCustomer(val);
+                                form.setFieldsValue({ shipToCustomer: val });
+                                const customer = billToCustomers.find(c => c.customerId === val)
+                                setShipToCustomers(customer ? [customer] : []);
+                                setSelectedShipToCustomer(val);
                                 validateCustomersMatch('billToCustomer', val);
                               }}
                               showSearch
@@ -569,8 +597,29 @@ export const Allocations = () => {
                             <Select
                               placeholder="Select ship-to customer"
                               disabled={!selectedSubRegion}
+                              loading={loadingShipToCustomers}
+                              // 2. Safely extract the array data from your API response
+                              onDropdownVisibleChange={async (open) => {
+                                if (open && (!shipToCustomers || shipToCustomers.length === 0)) {
+                                  setLoadingShipToCustomers(true);
+                                  try {
+                                    const response: any = await loadShipToCustomers();
+
+                                    // If your API wraps the array in an object like response.data or response.customers
+                                    const actualArray = response?.data || response || [];
+
+                                    setShipToCustomers(Array.isArray(actualArray) ? actualArray : []);
+                                  } catch (error) {
+                                    console.error("Failed to load ship-to customers:", error);
+                                    setShipToCustomers([]); // Fallback to empty array on error
+                                  } finally {
+                                    setLoadingShipToCustomers(false);
+                                  }
+                                }
+                              }}
                               onChange={(val) => {
                                 setSelectedShipToCustomer(val);
+                                form.setFieldsValue({ shipToLocation: undefined });
                                 validateCustomersMatch('shipToCustomer', val);
                               }}
                               showSearch
@@ -608,12 +657,12 @@ export const Allocations = () => {
                           )}
                         </Card>
                       </Col>
+
                     </>
                   );
                 }}
               </Form.Item>
 
-              {/* Remarks Field with Dynamic Validation */}
               <Col xs={24}>
                 <Form.Item
                   shouldUpdate={(prevValues, currentValues) => prevValues.optionType !== currentValues.optionType}
@@ -635,7 +684,6 @@ export const Allocations = () => {
               </Col>
             </Row>
           </Form>
-
         </Panel>
       </Collapse>
 
@@ -647,19 +695,18 @@ export const Allocations = () => {
               <Database size={18} style={{ color: 'var(--primary-color)' }} />
               <span style={{ fontWeight: 600 }}>2. B3 Line Items</span>
             </Space>
-            <Button type="primary" size='small' onClick={addLineRow} icon={<Plus size={16} />}>
-              Add Line Row
-            </Button>
           </div>
         }
-        style={{ borderRadius: 12, border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-sm)' }}
+        style={{ borderRadius: 12, border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-sm)', width: '100%' }}
       >
         {lines.map((line, idx) => (
-          <div key={line.id} className="line-item-row-container">
+          <div key={line.id} className="line-item-row-container" style={{ width: '100%' }}>
             {idx > 0 && <Divider style={{ margin: '16px 0' }} />}
 
-            <Row gutter={[16, 12]} align="bottom">
-              <Col xs={24} sm={12} md={4}>
+            {/* Added style width 100% */}
+            <Row gutter={[16, 12]} align="bottom" style={{ width: '100%', margin: 0 }}>
+              {/* Changed md from 4 to 5 */}
+              <Col xs={24} sm={12} md={5}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   <span className="field-label-custom">ORG</span>
                   <Select
@@ -677,6 +724,7 @@ export const Allocations = () => {
                 </div>
               </Col>
 
+              {/* Kept md at 5 */}
               <Col xs={24} sm={12} md={5}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   <span className="field-label-custom">Product</span>
@@ -698,32 +746,27 @@ export const Allocations = () => {
                 </div>
               </Col>
 
+              {/* Kept md at 5 */}
               <Col xs={24} sm={12} md={5}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <span className="field-label-custom">Item Description</span>
-                  <Input value={line.description} disabled style={{ backgroundColor: 'var(--bg-tertiary)' }} />
+                  <span>Item Description</span>
+                  <Input
+                    value={line.description}
+                    disabled
+                    style={{
+                      backgroundColor: 'var(--bg-tertiary)',
+                      width: '100%',
+                      color: '#000000',           /* Forces pure black text color */
+                      WebkitTextFillColor: '#000000', /* Fixes browser override on Safari/Chrome */
+                      opacity: 1,                 /* Prevents opacity fading from disabled state */
+                      cursor: 'not-allowed'       /* Retains the disabled interactive feel */
+                    }}
+                  />
                 </div>
               </Col>
 
-              <Col xs={24} sm={12} md={3}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <span className="field-label-custom">Week</span>
-                  <Select
-                    placeholder="Week"
-                    value={line.week}
-                    onChange={(val) => updateLineRow(line.id, 'week', val)}
-                    style={{ width: '100%' }}
-                  >
-                    {weeks.map(wk => (
-                      <Select.Option key={wk} value={wk}>
-                        {wk}
-                      </Select.Option>
-                    ))}
-                  </Select>
-                </div>
-              </Col>
-
-              <Col xs={24} sm={12} md={3}>
+              {/* Changed md from 3 to 4 */}
+              <Col xs={24} sm={12} md={4}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   <span className="field-label-custom">Requested Qty</span>
                   <Input
@@ -731,11 +774,13 @@ export const Allocations = () => {
                     min={1}
                     value={line.b3Quantity === 0 ? '' : line.b3Quantity}
                     onChange={(e) => updateLineRow(line.id, 'b3Quantity', parseInt(e.target.value) || 0)}
+                    style={{ width: '100%' }}
                   />
                 </div>
               </Col>
 
-              <Col xs={24} sm={12} md={3}>
+              {/* Changed md from 3 to 4 */}
+              <Col xs={24} sm={12} md={4}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   <span className="field-label-custom">Target Date</span>
                   <DatePicker
@@ -746,29 +791,42 @@ export const Allocations = () => {
                 </div>
               </Col>
 
-              <Col xs={24} sm={12} md={1}>
+              {/* Changed md from 1 to 1 remaining to fulfill 24 total grid count */}
+              <Col xs={24} sm={12} md={1} style={{ display: 'flex', justifyContent: 'center' }}>
                 <Button
                   danger
                   type="text"
                   icon={<Trash2 size={18} />}
                   onClick={() => removeLineRow(line.id)}
-                  style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 40 }}
+                  style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 40, width: '100%' }}
                 />
               </Col>
             </Row>
 
-            {/* Validation alerts and demand metrics */}
             <div style={{ marginTop: 12 }}>
-              {line.rrsWarning && (
+              {line.rrsError && (
                 <Alert
                   type="error"
                   showIcon
-                  message={`Validation Alert: Item returned restricted Sales Category "Rn" for organization.`}
+                  message={
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span>Validation Error: Item <strong>{line.itemCode}</strong> returned restricted Sales Category "Rn" for organization. This item cannot be used.</span>
+                      <Button
+                        type="primary"
+                        danger
+                        size="small"
+                        onClick={() => clearLine(line.id)}
+                        style={{ marginLeft: 16, whiteSpace: 'nowrap' }}
+                      >
+                        Clear Line
+                      </Button>
+                    </div>
+                  }
                   style={{ marginBottom: 8, borderRadius: 6 }}
                 />
               )}
 
-              {line.oaPendingQuantity !== undefined && (
+              {line.oaPendingQuantity !== undefined && !line.rrsError && (
                 <div className="metrics-container" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
                   <Tag color="blue" style={{ borderRadius: 4, padding: '4px 8px' }}>
                     <strong>OA Pending Qty:</strong> {line.oaPendingQuantity}
@@ -793,6 +851,9 @@ export const Allocations = () => {
       </Card>
 
       <div style={{ marginTop: 24, display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+        <Button type="primary" size='small' onClick={addLineRow} icon={<Plus size={16} />}>
+          Add Line Row
+        </Button>
         <Button size='small' onClick={() => navigate('/')} style={{ borderRadius: 8 }}>
           Cancel
         </Button>
@@ -809,4 +870,4 @@ export const Allocations = () => {
       </div>
     </div>
   );
-}
+};

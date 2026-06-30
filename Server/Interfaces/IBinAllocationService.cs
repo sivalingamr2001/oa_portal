@@ -19,7 +19,7 @@ public interface IBinAllocationService
     Task<AllocationHeaderDetailsDto> GetAllocationByHeaderIdAsync(decimal headerId);
 
     /// <summary>All lines currently pending HOD approval.</summary>
-    Task<IEnumerable<B3Line>> GetPendingApprovalLinesAsync();
+    Task<IEnumerable<B3LineWithMetricsDto>> GetPendingApprovalLinesAsync(CancellationToken cancellationToken = default);
 
     /// <summary>All cancellation records with context.</summary>
     Task<IEnumerable<B3Cancellation>> GetAllCancellationsAsync();

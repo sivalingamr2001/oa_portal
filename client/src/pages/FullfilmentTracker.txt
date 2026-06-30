@@ -1,0 +1,118 @@
+SELECT 
+    h.BILL_TO_CUSTOMER AS BillToCustomerId,
+    TRIM(cust_bill.customer_name) AS BillToCustomerName,
+    h.SHIP_TO_CUSTOMER AS ShipToCustomerId,
+    TRIM(cust_ship.customer_name) AS ShipToCustomerName,
+    h.CUSTOMER_ID AS CustomerId,
+    TRIM(cust_pri.customer_name) AS CustomerName,
+    h.HEADER_ID AS HeaderId,
+    TRIM(h.CUSTOMER_OR_ITEM_SPECIFIC) AS CustomerOrItemSpecific,
+    h.TERRITORY_ID AS TerritoryId,
+    TRIM(h.REMARKS) AS Remarks,
+    TO_CHAR(h.TRANSACTION_DATE, 'YYYY-MM-DD') AS TransactionDate,
+    TRIM(h.CREATED_BY) AS CreatedBy,
+    TO_CHAR(h.CREATED_DATE, 'YYYY-MM-DD') AS CreatedDate,
+    TRIM(h.UPDATED_BY) AS UpdatedBy,
+    TO_CHAR(h.UPDATED_DATE, 'YYYY-MM-DD') AS UpdatedDate,
+
+    l.LineId,
+    l.ApprovalFlag,
+    l.B3ApprovedQuantity,
+    l.B3Quantity,
+    l.OldRequestedQty, 
+    l.InventoryItemId,
+    l.OrganizationId,
+    l.OrganizationCode,
+    l.ItemCode,
+    l.ItemDescription,
+    l.TargetDate,
+    l.ClosureFlag,
+    l.Revision,
+    l.ParentLineId,
+
+    -- ── NEW SO DATA FIELDS FROM JAN_BE_VS_SO_TAB ──
+    l.SoHeaderId,
+    l.SoLineId,
+    l.SoOrderNumber,
+    l.SoLineNumber,
+    l.SoStatus,
+    l.SoQuantity
+FROM JAN_B3_HEADER h
+LEFT JOIN (
+    SELECT 
+        LineId,
+        HEADER_ID,
+        ApprovalFlag,
+        B3ApprovedQuantity,
+        B3Quantity,
+        OldRequestedQty,
+        InventoryItemId,
+        OrganizationId,
+        OrganizationCode,
+        ItemCode,
+        ItemDescription,
+        TargetDate,
+        ClosureFlag,
+        Revision,
+        ParentLineId,
+        
+        -- SO column aliases passed up to the parent block
+        SoHeaderId,
+        SoLineId,
+        SoOrderNumber,
+        SoLineNumber,
+        SoStatus,
+        SoQuantity,
+        
+        ROW_NUMBER() OVER (
+            PARTITION BY HEADER_ID, RootLineId 
+            ORDER BY Revision DESC, LineId DESC
+        ) AS rn
+    FROM (
+        SELECT 
+            lines.LINE_ID AS LineId,
+            lines.HEADER_ID,
+            TRIM(lines.APPROVAL_FLAG) AS ApprovalFlag,
+            lines.B3_APPROVED_QUANTITY AS B3ApprovedQuantity,
+            lines.B3_QUANTITY AS B3Quantity,
+            LAG(lines.B3_QUANTITY, 1) OVER (
+                PARTITION BY lines.HEADER_ID, CONNECT_BY_ROOT lines.LINE_ID 
+                ORDER BY lines.REVISION ASC, lines.LINE_ID ASC
+            ) AS OldRequestedQty,
+            lines.INVENTORY_ITEM_ID AS InventoryItemId,
+            lines.ORGANIZATION_ID AS OrganizationId,
+            TRIM(org.ORGANIZATION_CODE) AS OrganizationCode,
+            TRIM(itm.SEGMENT1) AS ItemCode,
+            TRIM(itm.DESCRIPTION) AS ItemDescription,
+            TO_CHAR(lines.TARGET_DATE, 'YYYY-MM-DD') AS TargetDate,
+            TRIM(lines.CLOSURE_FLAG) AS ClosureFlag,
+            lines.REVISION AS Revision,
+            lines.PARENT_LINE_ID AS ParentLineId,
+            CONNECT_BY_ROOT lines.LINE_ID AS RootLineId,
+
+            -- ── INNER JOIN FOR SO DATA ──
+            -- Select specific required columns from your SO mapping table
+            so.SO_HEADER_ID AS SoHeaderId,
+            so.SO_LINE_ID AS SoLineId,
+            TRIM(so.ORDER_NUMBER) AS SoOrderNumber,
+            so.LINE_NUMBER AS SoLineNumber,
+            TRIM(so.SO_STATUS) AS SoStatus,
+            so.SO_QUANTITY AS SoQuantity
+        FROM JAN_B3_LINES lines
+        INNER JOIN JAN_BE_VS_SO_TAB so ON so.B3_LINE_ID = lines.LINE_ID
+        LEFT JOIN ORG_ORGANIZATION_DEFINITIONS org ON lines.ORGANIZATION_ID = org.ORGANIZATION_ID
+        LEFT JOIN MTL_SYSTEM_ITEMS itm ON lines.INVENTORY_ITEM_ID = itm.INVENTORY_ITEM_ID 
+                                      AND lines.ORGANIZATION_ID = itm.ORGANIZATION_ID
+        START WITH lines.PARENT_LINE_ID IS NULL
+        CONNECT BY PRIOR lines.LINE_ID = lines.PARENT_LINE_ID
+    )
+) l ON h.HEADER_ID = l.HEADER_ID AND l.rn = 1
+LEFT JOIN ra_customers cust_pri ON h.CUSTOMER_ID = cust_pri.customer_id
+LEFT JOIN ra_customers cust_bill ON h.BILL_TO_CUSTOMER = cust_bill.customer_id
+LEFT JOIN ra_customers cust_ship ON h.SHIP_TO_CUSTOMER = cust_ship.customer_id
+WHERE 
+-- 1. Admin Override Rule
+:currentUser IN ('JANHPL', 'HO')
+
+-- 2. Standard User Filter Rule
+OR h.CREATED_BY = :currentUser;

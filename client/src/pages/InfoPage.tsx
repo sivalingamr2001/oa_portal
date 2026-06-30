@@ -90,12 +90,8 @@ type ItemWithMetricsRow = AllocationItem & {
 };
 
 const CANCEL_REASONS = [
-    'Production schedule revised',
-    'Customer request reduction',
     'Forecast correction',
-    'Raw material constraint',
-    'Order cancellation by customer',
-    'Quality hold',
+    'Incorrect Entries',
     'Other'
 ];
 

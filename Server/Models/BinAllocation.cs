@@ -22,6 +22,7 @@ public class B3Header
     // Lookups
     public string? CustomerName { get; set; }
     public string? CustomerRegion { get; set; }
+    public string? HeaderCode { get; set; }
 }
 
 public class AllocationRow : B3Header
@@ -221,3 +222,8 @@ public class CancellationDto
     public DateTime TransactionDate { get; set; }
 }
 
+public class B3LineWithMetricsDto
+{
+    public AllocationRow Allocation { get; set; } = null!;
+    public DemandMetricsDto? Metrics { get; set; }
+}

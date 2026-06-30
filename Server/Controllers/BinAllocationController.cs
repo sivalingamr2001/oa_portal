@@ -73,6 +73,7 @@ public class BinAllocationController : ControllerBase
     public async Task<IActionResult> GetPendingApproval()
     {
         var data = await _service.GetPendingApprovalLinesAsync();
+        
         return Ok(data);
     }
 

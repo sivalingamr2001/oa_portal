@@ -54,9 +54,8 @@ export function DynamicGrid<RecordType extends object>({
 
   return (
     <Card 
-      className="colorful-grid-card" 
       style={{ 
-        borderRadius: 16, 
+        borderRadius: 16,
         boxShadow: '0 4px 20px rgba(0, 0, 0, 0.05)',
         border: '1px solid #e2e8f0',
         overflow: 'hidden'
@@ -87,11 +86,9 @@ export function DynamicGrid<RecordType extends object>({
         columns={columnsWithSNo}
         dataSource={filteredData}
         size='small'
-        // Alternate raw class names based on index row oddity checks
         rowClassName={(_record, index) => {
           return index % 2 === 0 ? 'colorful-row-even' : 'colorful-row-odd';
         }}
-        className="premium-custom-table"
         pagination={{
           size: "small",
           current: currentPage,
