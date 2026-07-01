@@ -65,41 +65,41 @@ export const Dashboard = () => {
             <TrendingUp size={24} style={{ color: 'var(--primary-color)' }} />
             <Title level={2} style={{ margin: 0, color: 'var(--text-primary)' }}>B3 Dashboard</Title>
           </div>
-          <Text type="secondary">Monitor B3 transaction status, request quantity revisions, and review approvals</Text>
+          {/* <Text type="secondary">Monitor B3 transaction status, request quantity revisions, and review approvals</Text> */}
         </Space>
       </div>
 
-      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-        <Col xs={12} sm={12} md={6}>
-          <Card className="kpi-card" bordered={false}>
-            <Statistic
-              title="Total B3 Input"
-              value={stats.total}
-              prefix={<FileSpreadsheet size={20} color="var(--primary-color)" style={{ marginRight: 8 }} />}
-            />
-          </Card>
-        </Col>
-        <Col xs={12} sm={12} md={6}>
-          <Card className="kpi-card" bordered={false}>
-            <Statistic
-              title="Approval Pending"
-              value={stats.pending}
-              valueStyle={{ color: 'var(--warning-color)' }}
-              prefix={<Clock size={20} color="var(--warning-color)" style={{ marginRight: 8 }} />}
-            />
-          </Card>
-        </Col>
-        <Col xs={12} sm={12} md={6}>
-          <Card className="kpi-card" bordered={false}>
-            <Statistic
-              title="Cancelled / Rejected Lines"
-              value={stats.cancelled}
-              valueStyle={{ color: 'var(--error-color)' }}
-              prefix={<AlertTriangle size={20} color="var(--error-color)" style={{ marginRight: 8 }} />}
-            />
-          </Card>
-        </Col>
-      </Row>
+      <div className="stats-inline-banner">
+        {/* KPI 1 */}
+        <div className="stat-inline-item">
+          <FileSpreadsheet size={16} className="stat-icon icon-primary" />
+          <span className="stat-title">Total B3 Input</span>
+          <span className="stat-dot-separator">·</span>
+          <span className="stat-count-value value-primary">{stats.total}</span>
+        </div>
+
+        {/* Vertical Line Divider */}
+        <div className="stat-vertical-divider" />
+
+        {/* KPI 2 */}
+        <div className="stat-inline-item">
+          <Clock size={16} className="stat-icon icon-warning" />
+          <span className="stat-title">Approval Pending</span>
+          <span className="stat-dot-separator">·</span>
+          <span className="stat-count-value value-warning">{stats.pending}</span>
+        </div>
+
+        {/* Vertical Line Divider */}
+        <div className="stat-vertical-divider" />
+
+        {/* KPI 3 */}
+        <div className="stat-inline-item">
+          <AlertTriangle size={16} className="stat-icon icon-error" />
+          <span className="stat-title">Cancelled / Rejected Lines</span>
+          <span className="stat-dot-separator">·</span>
+          <span className="stat-count-value value-error">{stats.cancelled}</span>
+        </div>
+      </div>
 
       {/* Fulfillment Tracker Table */}
       <Row gutter={[16, 16]}>

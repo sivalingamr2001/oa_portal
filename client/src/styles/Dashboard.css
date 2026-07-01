@@ -1,5 +1,5 @@
 .dashboard-container {
-  padding: 24px;
+  padding: 16px 24px;
   max-width: 1400px;
   margin: 0 auto;
   animation: fadeIn 0.4s ease-out;
@@ -22,6 +22,8 @@
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
   background: rgba(255, 255, 255, 0.9) !important;
   backdrop-filter: blur(8px);
+  padding: 0 !important;
+  margin: 0 !important;
 }
 
 .kpi-card:hover {
@@ -43,7 +45,8 @@
   font-weight: 700;
   display: flex;
   align-items: center;
-  margin-top: 8px;
+  margin: 0;
+  padding: 0;
 }
 
 /* Timeline Custom Styles */
@@ -80,4 +83,67 @@
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* ─── INLINE BANNER CONTAINER ────────────────────────── */
+.stats-inline-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1.5rem;
+  width: 100%;
+  padding: 0.75rem 1.25rem;
+  background-color: var(--bg-surface, #ffffff);
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 0.5rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.02);
+}
+
+/* Individual Metric Item Alignment */
+.stat-inline-item {
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.stat-icon {
+  margin-right: 0.5rem;
+  display: flex;
+  align-items: center;
+}
+
+/* Color Variables Configuration */
+.icon-primary { color: var(--primary-color, #2563eb); }
+.icon-warning { color: var(--warning-color, #f59e0b); }
+.icon-error { color: var(--error-color, #ef4444); }
+
+.stat-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #475569; /* Elegant muted text */
+}
+
+/* ─── DOT SEPARATOR CHARACTER ────────────────────────── */
+.stat-dot-separator {
+  margin: 0 0.5rem;
+  font-weight: 700;
+  color: #cbd5e1;
+}
+
+/* Count Value Metrics Styles */
+.stat-count-value {
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+.stat-count-value.value-primary { color: #1e293b; }
+.stat-count-value.value-warning { color: var(--warning-color, #d97706); }
+.stat-count-value.value-error { color: var(--error-color, #dc2626); }
+
+/* ─── STRUT REUSABLE VERTICAL DIVIDER ────────────────── */
+.stat-vertical-divider {
+  width: 1px;
+  height: 1.25rem;
+  background-color: var(--border, #cbd5e1);
+  opacity: 0.7;
 }

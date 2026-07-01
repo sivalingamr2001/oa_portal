@@ -90,31 +90,6 @@ export default function FulfillmentTracker({ currentUser }: { currentUser: strin
     // Main columns — header level
     const mainColumns: ColumnsType<AllocationFulfillment> = [
         {
-            title: 'DATE',
-            dataIndex: 'transactionDate',
-            key: 'transactionDate',
-            width: 90,
-            render: (date: string) => {
-                if (!date) return <span style={{ color: '#94a3b8', fontSize: '12px' }}>-</span>;
-
-                try {
-                    const parsedDate = new Date(date);
-
-                    if (isNaN(parsedDate.getTime())) throw new Error();
-
-                    const formattedDate = new Intl.DateTimeFormat('en-GB', {
-                        day: '2-digit',
-                        month: '2-digit',
-                        year: 'numeric'
-                    }).format(parsedDate).replace(/\//g, '-');
-
-                    return <span style={{ color: '#475569', fontSize: '12px', fontWeight: 500 }}>{formattedDate}</span>;
-                } catch {
-                    return <span style={{ color: '#94a3b8', fontSize: '12px' }}>-</span>;
-                }
-            }
-        },
-        {
             title: 'B3 NUMBER',
             dataIndex: 'headerCode',
             key: 'headerCode',
@@ -188,15 +163,15 @@ export default function FulfillmentTracker({ currentUser }: { currentUser: strin
                 );
             },
         },
-        // {
-        //     title: 'CUSTOMER',
-        //     dataIndex: 'customerName',
-        //     key: 'customerName',
-        //     width: 220,
-        //     render: (name: string) => (
-        //         <span style={{ color: '#475569', fontWeight: 500 }}>{name || "-"}</span>
-        //     ),
-        // },
+        {
+            title: 'CUSTOMER',
+            dataIndex: 'customerName',
+            key: 'customerName',
+            width: 220,
+            render: (name: string) => (
+                <span style={{ color: '#475569', fontWeight: 500 }}>{name || "-"}</span>
+            ),
+        },
         {
             title: 'B3 QTY',
             dataIndex: 'b3ApprovedQuantity',
@@ -233,26 +208,52 @@ export default function FulfillmentTracker({ currentUser }: { currentUser: strin
             title: 'PROGRESS',
             key: 'progress',
             align: 'center',
-            width: 140,
+            width: 150,
             render: (_: unknown, record: AllocationFulfillment) => {
                 if (!record) return "-";
+
                 const approvedQty = record.b3ApprovedQuantity || 0;
                 const soAllocated = record.allocatedSoQuantity || 0;
                 if (approvedQty === 0 && soAllocated === 0) return "-";
 
+                // Determine operational fulfillment statuses
+                const isFulfilled = soAllocated >= approvedQty && approvedQty > 0;
+                const isPartial = soAllocated > 0 && soAllocated < approvedQty;
+                const isOpen = soAllocated === 0 && approvedQty > 0;
+
+                // Calculate overdue days relative to transaction baseline
+                const overDue = record.transactionDate
+                    ? Math.ceil((new Date().getTime() - new Date(record.transactionDate).getTime()) / (1000 * 60 * 60 * 24))
+                    : 0;
+
+                // Calculate explicit fulfillment percentage matching metrics
                 const pct = approvedQty > 0 ? Math.min(100, Math.round((soAllocated / approvedQty) * 100)) : 0;
+
+                // Display overdue tag strictly on non-fulfilled lines with valid delays
+                const showOverdueTag = overDue > 0 && (isPartial || isOpen);
+
                 return (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#64748b', minWidth: '28px' }}>
-                            {pct}%
-                        </span>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%', padding: '0 4px' }}>
+                        {/* TOP ROW: Text Elements distributed Left and Right */}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                            <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#475569' }}>
+                                {pct}%
+                            </span>
+                            {showOverdueTag && (
+                                <Tag color="error" style={{ borderRadius: '12px', fontWeight: 600, fontSize: '11px', margin: 0 }}>
+                                    {overDue} days
+                                </Tag>
+                            )}
+                        </div>
+
+                        {/* BOTTOM ROW: Full width Progress Bar line indicator */}
                         <Progress
                             percent={pct}
                             showInfo={false}
-                            strokeColor={pct === 100 ? '#10b981' : '#f59e0b'}
+                            strokeColor={isFulfilled ? '#10b981' : '#f59e0b'}
                             railColor="#e2e8f0"
                             size="small"
-                            style={{ margin: 0, width: 80 }}
+                            style={{ margin: 0, width: '100%' }}
                         />
                     </div>
                 );
@@ -265,14 +266,17 @@ export default function FulfillmentTracker({ currentUser }: { currentUser: strin
             width: 130,
             render: (_: unknown, record: AllocationFulfillment) => {
                 if (!record) return "-";
+
                 const approved = record.b3ApprovedQuantity || 0;
                 const soAllocated = record.allocatedSoQuantity || 0;
                 if (approved === 0 && soAllocated === 0) return "-";
 
-                if (soAllocated >= approved && approved > 0)
+                if (soAllocated >= approved && approved > 0) {
                     return <Tag color="success" style={{ borderRadius: '12px', fontWeight: 600 }}>Fulfilled</Tag>;
-                if (soAllocated > 0)
+                }
+                if (soAllocated > 0) {
                     return <Tag color="warning" style={{ borderRadius: '12px', fontWeight: 600 }}>Partial</Tag>;
+                }
                 return <Tag color="default" style={{ borderRadius: '12px', fontWeight: 600 }}>Open</Tag>;
             },
         },
@@ -409,19 +413,14 @@ export default function FulfillmentTracker({ currentUser }: { currentUser: strin
 
     return (
         <>
-            <div className="dashboard-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-                <Space direction="vertical" size={2}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <BoxesIcon size={24} style={{ color: 'var(--primary-color)' }} />
-                        <Title level={4} style={{ margin: 0, color: 'var(--text-primary)' }}>Fulfillment Tracker</Title>
-                    </div>
-                </Space>
-            </div>
             <DynamicGrid<AllocationFulfillment>
+                title="Fulfillment Tracker"
+                enableSearch={true}
                 columns={mainColumns}
                 dataSource={filteredData}
                 loading={loading}
                 searchPlaceholder="Search by item, customer, org code..."
+                showSerialNumber={false}
                 extraHeaderActions={
                     <Space style={{ gap: '12px' }}>
                         <span style={{ fontSize: '14px', fontWeight: 600, color: '#334155' }}>

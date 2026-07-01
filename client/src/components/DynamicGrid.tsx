@@ -2,22 +2,27 @@ import React, { useState, useMemo } from 'react';
 import { Table, Input, Card, Space } from 'antd';
 import type { ColumnsType, TableProps } from 'antd/es/table';
 import { Search } from 'lucide-react';
-import '../styles/DynamicGridStyles.css'; // Importing the style properties below
+import '../styles/DynamicGridStyles.css';
 
-interface DynamicGridProps<RecordType> extends Omit<TableProps<RecordType>, 'columns' | 'dataSource'> {
+interface DynamicGridProps<RecordType>
+  extends Omit<TableProps<RecordType>, 'columns' | 'dataSource' | 'title'> {
+  title?: string; // Now seamlessly assignable as a string primitive!
   columns: ColumnsType<RecordType>;
   dataSource: RecordType[];
   searchPlaceholder?: string;
   extraHeaderActions?: React.ReactNode;
   enableSearch?: boolean;
+  showSerialNumber?: boolean;
 }
 
 export function DynamicGrid<RecordType extends object>({
+  title,
   columns,
   dataSource,
   searchPlaceholder = 'Search...',
   extraHeaderActions,
   enableSearch = true,
+  showSerialNumber = true,
   ...tableProps
 }: DynamicGridProps<RecordType>) {
   const [searchText, setSearchText] = useState('');
@@ -38,6 +43,8 @@ export function DynamicGrid<RecordType extends object>({
   }, [dataSource, searchText]);
 
   const columnsWithSNo = useMemo(() => {
+    if (!showSerialNumber) return columns;
+
     const snoColumn: ColumnsType<RecordType>[number] = {
       title: 'S.No',
       key: 'serialNumber',
@@ -50,11 +57,11 @@ export function DynamicGrid<RecordType extends object>({
       },
     };
     return [snoColumn, ...columns];
-  }, [columns, currentPage, pageSize]);
+  }, [columns, currentPage, pageSize, showSerialNumber]);
 
   return (
-    <Card 
-      style={{ 
+    <Card
+      style={{
         borderRadius: 16,
         boxShadow: '0 4px 20px rgba(0, 0, 0, 0.05)',
         border: '1px solid #e2e8f0',
@@ -62,6 +69,14 @@ export function DynamicGrid<RecordType extends object>({
       }}
       variant="outlined"
     >
+      <div>
+        {title && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+            <h2 style={{ margin: 0, color: 'var(--text-primary)' }}>{title}</h2>
+          </div>
+        )}
+      </div>
+
       {(enableSearch || extraHeaderActions) && (
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 12, padding: '4px 4px 0 4px' }}>
           {enableSearch ? (
