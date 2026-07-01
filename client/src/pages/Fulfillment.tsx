@@ -8,9 +8,8 @@ import { getAllAllocations, reviseQuantity } from '../api/allocationApi';
 import { DynamicGrid } from '../components/DynamicGrid';
 import { FilterHeader } from '../components/FilterHeader';
 import { Loader } from '../components/Loader';
-import { useLoader } from '../hooks/useLoader';
 import { useAuth } from '../context/AuthContext';
-import FulfillmentTracker from './TrackerPage';
+import { useLoader } from '../hooks/useLoader';
 
 const { Option } = Select;
 
@@ -222,7 +221,7 @@ export const Fulfillment: React.FC = () => {
         if (record.cancelledLines === record.totalLines) {
           return <Tag color="error">Cancelled</Tag>;
         }
-        return <Tag color="success">Fulfilled</Tag>;
+        return <Tag color="success">Approved</Tag>;
       }
     },
     {
@@ -506,10 +505,6 @@ export const Fulfillment: React.FC = () => {
           }}
         />
       }
-
-      <div>
-        <FulfillmentTracker />
-      </div>
     </div>
   );
 };

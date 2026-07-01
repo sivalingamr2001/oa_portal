@@ -1,164 +1,259 @@
-import type { TableColumnsType } from 'antd';
-import { Button, Progress, Table, Tag } from 'antd';
-import { Edit3 } from 'lucide-react';
-import React, { useMemo, useState } from 'react';
+import { Badge, Progress, Tag, Select, Space, Button, Tooltip } from 'antd';
+import type { ColumnsType } from 'antd/es/table';
+import React, { useEffect, useMemo, useState } from 'react';
+import type { AllocationFulfillment, SalesOrderLine } from '../api/allocationApi';
+import { getAllocationFulfillments } from '../api/allocationApi';
+import { DynamicGrid } from '../components/DynamicGrid';
+import { BoxesIcon, X } from 'lucide-react';
+import Title from 'antd/es/typography/Title';
 
-// --- TYPES ---
-export interface SalesOrderLine {
-    SO_ID: number;
-    B3_LINE_ID: number | null;
-    SO_LINE_ID: number | null;
-    SO_LINE_NO: number | null;
-    ORDER_NUMBER: number | null;
-    QUANTITY: number | null;
-    ORDER_ENTERED_DATE: string | null;
-    INVENTORY_ITEM_ID: number | null;
-    ITEM_NO: string | null;
-    ORG_ID: number | null;
-    CUSTOMER_ID: number | null;
-    CUSTOMER_NAME: string | null;
-    CREATION_DATE: string;
-}
-
-export interface ProductionLine {
-    LINE_ID: number;
-    HEADER_ID: number;
-    ORGANIZATION_ID: number | null;
-    INVENTORY_ITEM_ID: number;
-    B3_QUANTITY: number;
-    TARGET_DATE: string | null;
-    B3_APPROVED_QUANTITY: number | null;
-    APPROVAL_FLAG: 'Y' | 'N';
-    APPROVED_DATE: string | null;
-    APPROVED_BY: string | null;
-    CLOSURE_FLAG: 'Y' | 'N';
-    REVISION: number | null;
-    PARENT_LINE_ID: number | null;
-    AMENDMENT_REASON: string | null;
-    ITEM_NAME_DISPLAY?: string;
-    REGION_DISPLAY?: string;
-    ITEM_CODE?: string;
-    allocatedSoQuantity?: number;
-    salesOrderLines?: SalesOrderLine[];
-}
-
-// --- MOCK DATA ---
-const mockProductionData: ProductionLine[] = [
-    {
-        LINE_ID: 501, HEADER_ID: 3001, ORGANIZATION_ID: 11, INVENTORY_ITEM_ID: 9001, B3_QUANTITY: 480,
-        TARGET_DATE: '2026-12-01', B3_APPROVED_QUANTITY: 400, APPROVAL_FLAG: 'Y', APPROVED_DATE: '2026-11-01',
-        APPROVED_BY: 'M_SMITH', CLOSURE_FLAG: 'N', REVISION: 1, PARENT_LINE_ID: null, AMENDMENT_REASON: 'Initial',
-        ITEM_NAME_DISPLAY: 'PCB Assembly Rev3', REGION_DISPLAY: 'Maharashtra', ITEM_CODE: 'PCB-001',
-        allocatedSoQuantity: 0, salesOrderLines: []
-    },
-    {
-        LINE_ID: 502, HEADER_ID: 3001, ORGANIZATION_ID: 11, INVENTORY_ITEM_ID: 9001, B3_QUANTITY: 480,
-        TARGET_DATE: '2026-12-01', B3_APPROVED_QUANTITY: 420, APPROVAL_FLAG: 'Y', APPROVED_DATE: '2026-11-10',
-        APPROVED_BY: 'M_SMITH', CLOSURE_FLAG: 'N', REVISION: 2, PARENT_LINE_ID: 501, AMENDMENT_REASON: 'Update',
-        ITEM_NAME_DISPLAY: 'PCB Assembly Rev3', REGION_DISPLAY: 'Maharashtra', ITEM_CODE: 'PCB-001',
-        allocatedSoQuantity: 0, salesOrderLines: []
-    },
-    {
-        LINE_ID: 503, HEADER_ID: 3001, ORGANIZATION_ID: 11, INVENTORY_ITEM_ID: 9001, B3_QUANTITY: 480,
-        TARGET_DATE: '2026-12-01', B3_APPROVED_QUANTITY: 450, APPROVAL_FLAG: 'Y', APPROVED_DATE: '2026-11-20',
-        APPROVED_BY: 'M_SMITH', CLOSURE_FLAG: 'N', REVISION: 3, PARENT_LINE_ID: 501, AMENDMENT_REASON: 'Final',
-        ITEM_NAME_DISPLAY: 'PCB Assembly Rev3', REGION_DISPLAY: 'Maharashtra', ITEM_CODE: 'PCB-001',
-        allocatedSoQuantity: 450,
-        salesOrderLines: [
-            { SO_ID: 1, B3_LINE_ID: 503, SO_LINE_ID: 201, SO_LINE_NO: 1, ORDER_NUMBER: 20260421, QUANTITY: 200, ORDER_ENTERED_DATE: '2026-11-10', INVENTORY_ITEM_ID: 9001, ITEM_NO: 'PCB-001', ORG_ID: 11, CUSTOMER_ID: 88, CUSTOMER_NAME: 'ABC Electronics Ltd', CREATION_DATE: '2026-11-10' },
-            { SO_ID: 2, B3_LINE_ID: 503, SO_LINE_ID: 202, SO_LINE_NO: 2, ORDER_NUMBER: 20260438, QUANTITY: 150, ORDER_ENTERED_DATE: '2026-11-15', INVENTORY_ITEM_ID: 9001, ITEM_NO: 'PCB-001', ORG_ID: 11, CUSTOMER_ID: 88, CUSTOMER_NAME: 'ABC Electronics Ltd', CREATION_DATE: '2026-11-15' },
-            { SO_ID: 3, B3_LINE_ID: 503, SO_LINE_ID: 203, SO_LINE_NO: 3, ORDER_NUMBER: 20260445, QUANTITY: 100, ORDER_ENTERED_DATE: '2026-11-18', INVENTORY_ITEM_ID: 9001, ITEM_NO: 'PCB-001', ORG_ID: 11, CUSTOMER_ID: 88, CUSTOMER_NAME: 'ABC Electronics Ltd', CREATION_DATE: '2026-11-18' }
-        ]
-    },
-    {
-        LINE_ID: 601, HEADER_ID: 3002, ORGANIZATION_ID: 11, INVENTORY_ITEM_ID: 9002, B3_QUANTITY: 10000,
-        TARGET_DATE: '2026-12-05', B3_APPROVED_QUANTITY: 10000, APPROVAL_FLAG: 'Y', APPROVED_DATE: '2026-11-21',
-        APPROVED_BY: 'J_DOE', CLOSURE_FLAG: 'Y', REVISION: 1, PARENT_LINE_ID: null, AMENDMENT_REASON: null,
-        ITEM_NAME_DISPLAY: 'Resistor 10K Ω 1%', REGION_DISPLAY: 'Maharashtra', ITEM_CODE: 'RES-010K',
-        allocatedSoQuantity: 0, salesOrderLines: []
-    }
-];
-
-export default function FulfillmentTracker() {
+// --- COMPONENT ---
+export default function FulfillmentTracker({ currentUser }: { currentUser: string }) {
+    const [data, setData] = useState<AllocationFulfillment[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
     const [expandedRowKeys, setExpandedRowKeys] = useState<React.Key[]>([]);
 
-    // Process latest revision per group
-    const latestProductionLines = useMemo(() => {
-        const groups = new Map<number, ProductionLine[]>();
-        mockProductionData.forEach(line => {
-            const groupKey = line.PARENT_LINE_ID || line.LINE_ID;
-            if (!groups.has(groupKey)) {
-                groups.set(groupKey, []);
+    // Filter state
+    const [statusFilter, setStatusFilter] = useState<string | null>(null);
+    const [orgFilter, setOrgFilter] = useState<string | null>(null);
+    const [approvalFilter, setApprovalFilter] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (!currentUser) return;
+        let cancelled = false;
+
+        const fetchData = async () => {
+            setLoading(true);
+            setError(null);
+            try {
+                const result = await getAllocationFulfillments(currentUser);
+                console.log('Fetched fulfillment data:', result);
+                if (!cancelled) setData(result);
+            } catch (err) {
+                console.error('Error fetching data:', err);
+                if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load data');
+            } finally {
+                if (!cancelled) setLoading(false);
             }
-            groups.get(groupKey)!.push(line);
-        });
+        };
 
-        return Array.from(groups.values()).map(group =>
-            group.reduce((latest, current) => (current.REVISION || 0) > (latest.REVISION || 0) ? current : latest)
-        );
-    }, []);
+        fetchData();
+        return () => { cancelled = true; };
+    }, [currentUser]);
 
-    // Controlled expand/collapse
-    const handleExpand = (expanded: boolean, record: ProductionLine) => {
+    const handleExpand = (expanded: boolean, record: AllocationFulfillment) => {
+        console.log(`Expand clicked for lineId ${record.lineId}:`, expanded, record.salesOrderLines);
         setExpandedRowKeys(prev =>
-            expanded ? [...prev, record.LINE_ID] : prev.filter(key => key !== record.LINE_ID)
+            expanded
+                ? [...prev, record.lineId]
+                : prev.filter(key => key !== record.lineId)
         );
     };
 
-    // Main columns — properly typed
-    const mainColumns: TableColumnsType<ProductionLine> = [
+    // Get unique organizations for filter
+    const orgOptions = useMemo(() => {
+        const orgs = new Set(data.map(d => d.organizationCode).filter(Boolean));
+        return Array.from(orgs).map(org => ({ label: org, value: org }));
+    }, [data]);
+
+    // Filter data based on selected filters
+    const filteredData = useMemo(() => {
+        return data.filter(record => {
+            // Status filter
+            if (statusFilter) {
+                const approved = record.b3ApprovedQuantity || 0;
+                const soAllocated = record.allocatedSoQuantity || 0;
+                const status =
+                    soAllocated >= approved && approved > 0 ? 'fulfilled' :
+                        soAllocated > 0 ? 'partial' : 'open';
+                if (status !== statusFilter) return false;
+            }
+
+            // Organization filter
+            if (orgFilter && record.organizationCode !== orgFilter) return false;
+
+            // Approval flag filter
+            if (approvalFilter && record.approvalFlag !== approvalFilter) return false;
+
+            return true;
+        });
+    }, [data, statusFilter, orgFilter, approvalFilter]);
+
+    // Clear all filters
+    const handleClearFilters = () => {
+        setStatusFilter(null);
+        setOrgFilter(null);
+        setApprovalFilter(null);
+    };
+
+    // Main columns — header level
+    const mainColumns: ColumnsType<AllocationFulfillment> = [
         {
-            title: 'ITEM CODE',
-            dataIndex: 'ITEM_CODE',
-            key: 'itemCode',
+            title: 'DATE',
+            dataIndex: 'transactionDate',
+            key: 'transactionDate',
+            width: 90,
+            render: (date: string) => {
+                if (!date) return <span style={{ color: '#94a3b8', fontSize: '12px' }}>-</span>;
+
+                try {
+                    const parsedDate = new Date(date);
+
+                    if (isNaN(parsedDate.getTime())) throw new Error();
+
+                    const formattedDate = new Intl.DateTimeFormat('en-GB', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric'
+                    }).format(parsedDate).replace(/\//g, '-');
+
+                    return <span style={{ color: '#475569', fontSize: '12px', fontWeight: 500 }}>{formattedDate}</span>;
+                } catch {
+                    return <span style={{ color: '#94a3b8', fontSize: '12px' }}>-</span>;
+                }
+            }
+        },
+        {
+            title: 'B3 NUMBER',
+            dataIndex: 'headerCode',
+            key: 'headerCode',
+            width: 100,
             render: (code: string) => (
-                <span style={{ color: '#2563eb', fontWeight: 500, cursor: 'pointer', fontSize: '12px' }}>
-                    {code || 'N/A'}
-                </span>
+                <span style={{ color: '#475569', fontWeight: 500 }}>{code || "-"}</span>
             ),
         },
         {
-            title: 'ITEM NAME',
-            dataIndex: 'ITEM_NAME_DISPLAY',
-            key: 'itemName',
-            render: (text: string) => <span style={{ fontWeight: 500, color: '#475569' }}>{text}</span>,
+            title: 'ITEM INFO',
+            key: 'itemInfo',
+            width: 240,
+            render: (_, record: { itemCode: string; itemDescription: string, customerName: string }) => {
+                const code = record?.itemCode || 'N/A';
+                const description = record?.itemDescription || '';
+                const customerName = record?.customerName || 'N/A';
+
+                if (!record?.itemCode && !description) return "-";
+
+                // Calculate lengths for truncation boundaries
+                const rawSeparator = " - ";
+                const combinedText = description ? `${code}${rawSeparator}${description}` : code;
+                const needsTruncation = combinedText.length > 45;
+
+                // Truncate description dynamically if total length breaks the 25-char limit
+                let displayedDescription = description;
+                if (needsTruncation && description) {
+                    const availableSpace = 25 - code.length - rawSeparator.length;
+                    displayedDescription = availableSpace > 0
+                        ? `${description.slice(0, availableSpace)}...`
+                        : '...';
+                }
+
+                // Custom multi-line content for the Tooltip popup
+                const tooltipContent = (
+                    <div style={{ width: 'max-content', maxWidth: '320px', display: 'flex', flexDirection: 'column', gap: '4px', padding: '4px' }}>
+                        {[
+                            { label: 'CODE', val: code, bold: true, color: '#ffffff' },
+                            { label: 'NAME', val: description || 'N/A', bold: false, color: '#f1f5f9' },
+                            { label: 'CUSTOMER', val: customerName || '-', bold: false, color: '#f1f5f9' }
+                        ].map(({ label, val, bold, color }) => (
+                            <div key={label} style={{ display: 'flex', gap: '6px', fontSize: '12px', alignItems: 'baseline' }}>
+                                <span style={{ fontWeight: 700, color: '#93c5fd', fontSize: '11px', width: '75px', flexShrink: 0 }}>
+                                    {label}:
+                                </span>
+                                <span style={{ fontWeight: bold ? 600 : 400, color, whiteSpace: 'normal', wordBreak: 'break-word' }}>
+                                    {val}
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                );
+
+                return (
+                    <Tooltip
+                        title={tooltipContent}
+                        mouseEnterDelay={0.2}
+                        placement="top"
+                        autoAdjustOverflow={true}
+                        overlayStyle={{ maxWidth: 'max-content' }} // Forces AntD container to scale out
+                    >
+                        <span style={{ cursor: needsTruncation ? 'pointer' : 'default', fontSize: '12px' }}>
+                            <span style={{ color: '#2563eb', fontWeight: 600 }}>{code}</span>
+                            {description && (
+                                <span style={{ color: '#475569', fontWeight: 500 }}>
+                                    {rawSeparator}{displayedDescription}
+                                </span>
+                            )}
+                        </span>
+                    </Tooltip>
+                );
+            },
         },
+        // {
+        //     title: 'CUSTOMER',
+        //     dataIndex: 'customerName',
+        //     key: 'customerName',
+        //     width: 220,
+        //     render: (name: string) => (
+        //         <span style={{ color: '#475569', fontWeight: 500 }}>{name || "-"}</span>
+        //     ),
+        // },
         {
-            title: 'CUSTOMER / CONTEXT',
-            key: 'context',
-            render: (_: unknown, record: ProductionLine) => (
-                <span style={{ color: '#64748b' }}>
-                    <strong style={{ color: '#334155' }}>ABC Electronics</strong> &bull; {record.REGION_DISPLAY || 'Global'}
-                </span>
-            ),
-        },
-        {
-            title: 'QTY REQ',
-            dataIndex: 'B3_QUANTITY',
-            key: 'qtyReq',
+            title: 'B3 QTY',
+            dataIndex: 'b3ApprovedQuantity',
+            key: 'b3ApprovedQuantity',
             align: 'right',
-            render: (val: number) => <strong style={{ color: '#334155' }}>{val?.toLocaleString()}</strong>,
+            width: 100,
+            render: (val: number) => (
+                val !== null && val !== undefined ? (
+                    <Badge
+                        count={val.toLocaleString()}
+                        overflowCount={Number.MAX_SAFE_INTEGER}
+                        style={{ backgroundColor: '#dbeafe', color: '#1d4ed8', fontWeight: 700, fontSize: '12px' }}
+                    />
+                ) : "-"
+            ),
         },
         {
             title: 'ALLOCATED',
-            dataIndex: 'B3_APPROVED_QUANTITY',
-            key: 'allocated',
+            dataIndex: 'allocatedSoQuantity',
+            key: 'allocatedSoQuantity',
             align: 'right',
-            render: (val: number | null) => <strong style={{ color: '#334155' }}>{(val || 0).toLocaleString()}</strong>,
+            width: 100,
+            render: (val: number) => (
+                val !== null && val !== undefined ? (
+                    <Badge
+                        count={val.toLocaleString()}
+                        overflowCount={Number.MAX_SAFE_INTEGER}
+                        style={{ backgroundColor: '#dcfce7', color: '#15803d', fontWeight: 700, fontSize: '12px' }}
+                    />
+                ) : "-"
+            ),
         },
         {
-            title: 'FILL PROGRESS',
+            title: 'PROGRESS',
             key: 'progress',
             align: 'center',
-            width: 150,
-            render: (_: unknown, record: ProductionLine) => {
-                const approvedQty = record.B3_APPROVED_QUANTITY || 0;
+            width: 140,
+            render: (_: unknown, record: AllocationFulfillment) => {
+                if (!record) return "-";
+                const approvedQty = record.b3ApprovedQuantity || 0;
                 const soAllocated = record.allocatedSoQuantity || 0;
+                if (approvedQty === 0 && soAllocated === 0) return "-";
+
                 const pct = approvedQty > 0 ? Math.min(100, Math.round((soAllocated / approvedQty) * 100)) : 0;
                 return (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingLeft: '8px' }}>
-                        <span style={{ fontSize: '10px', fontWeight: 'bold', color: '#64748b', width: '28px', textAlign: 'right' }}>{pct}%</span>
-                        <Progress percent={pct} showInfo={false} strokeColor={pct === 100 ? '#10b981' : '#f59e0b'} size="small" style={{ margin: 0 }} />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#64748b', minWidth: '28px' }}>
+                            {pct}%
+                        </span>
+                        <Progress
+                            percent={pct}
+                            showInfo={false}
+                            strokeColor={pct === 100 ? '#10b981' : '#f59e0b'}
+                            railColor="#e2e8f0"
+                            size="small"
+                            style={{ margin: 0, width: 80 }}
+                        />
                     </div>
                 );
             },
@@ -167,106 +262,227 @@ export default function FulfillmentTracker() {
             title: 'STATUS',
             key: 'status',
             align: 'center',
-            render: (_: unknown, record: ProductionLine) => {
-                const approved = record.B3_APPROVED_QUANTITY || 0;
+            width: 130,
+            render: (_: unknown, record: AllocationFulfillment) => {
+                if (!record) return "-";
+                const approved = record.b3ApprovedQuantity || 0;
                 const soAllocated = record.allocatedSoQuantity || 0;
-                if (soAllocated >= approved && approved > 0) return <Tag color="success" style={{ borderRadius: '12px' }}>Fulfilled</Tag>;
-                if (soAllocated > 0) return <Tag color="warning" style={{ borderRadius: '12px' }}>Partial</Tag>;
-                return <Tag color="default" style={{ borderRadius: '12px' }}>Open</Tag>;
+                if (approved === 0 && soAllocated === 0) return "-";
+
+                if (soAllocated >= approved && approved > 0)
+                    return <Tag color="success" style={{ borderRadius: '12px', fontWeight: 600 }}>Fulfilled</Tag>;
+                if (soAllocated > 0)
+                    return <Tag color="warning" style={{ borderRadius: '12px', fontWeight: 600 }}>Partial</Tag>;
+                return <Tag color="default" style={{ borderRadius: '12px', fontWeight: 600 }}>Open</Tag>;
             },
         },
+    ];
+
+    const soLineColumns: ColumnsType<SalesOrderLine> = [
         {
-            title: 'ACTIONS',
-            key: 'actions',
+            title: 'Order Number',
+            dataIndex: 'orderNumber',
+            key: 'orderNumber',
+            width: 140,
+            render: (num: number) => (
+                num !== null && num !== undefined ? (
+                    <Badge
+                        count={`${num}`}
+                        overflowCount={Number.MAX_SAFE_INTEGER}
+                        style={{ backgroundColor: '#ede9fe', color: '#6d28d9', fontWeight: 600, fontSize: '11px' }}
+                    />
+                ) : "-"
+            ),
+        },
+        {
+            title: 'CUSTOMER',
+            dataIndex: 'customerName',
+            key: 'customerName',
+            width: 220,
+            render: (name: string) => <span style={{ color: '#475569', fontWeight: 500 }}>{name || "-"}</span>,
+        },
+        {
+            title: 'ALLOCATED QTY',
+            dataIndex: 'quantity',
+            key: 'quantity',
+            align: 'right',
+            width: 80,
+            render: (val: number) => (
+                val !== null && val !== undefined ? (
+                    <Badge
+                        count={val.toLocaleString()}
+                        overflowCount={Number.MAX_SAFE_INTEGER}
+                        style={{ backgroundColor: '#dbeafe', color: '#1d4ed8', fontWeight: 700, fontSize: '12px' }}
+                    />
+                ) : "-"
+            ),
+        },
+        {
+            title: 'ORDER DATE',
+            dataIndex: 'orderEnteredDate',
+            key: 'orderEnteredDate',
+            width: 120,
+            // Enable sorting based on the string date values
+            sorter: (a, b) => {
+                const dateA = a.orderEnteredDate || '';
+                const dateB = b.orderEnteredDate || '';
+                return dateA.localeCompare(dateB);
+            },
+            defaultSortOrder: 'ascend', // Optional: forces ASC order by default on load
+            render: (date: string) => {
+                if (!date) return <span style={{ color: '#94a3b8', fontSize: '12px' }}>-</span>;
+
+                try {
+                    const parsedDate = new Date(date);
+
+                    if (isNaN(parsedDate.getTime())) throw new Error();
+
+                    const formattedDate = new Intl.DateTimeFormat('en-GB', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric' // Displays full 4-digit year or use '2-digit' for YY
+                    }).format(parsedDate).replace(/\//g, '-');
+
+                    return <span style={{ color: '#475569', fontSize: '12px', fontWeight: 500 }}>{formattedDate}</span>;
+                } catch {
+                    return <span style={{ color: '#94a3b8', fontSize: '12px' }}>-</span>;
+                }
+            }
+        },
+        {
+            title: 'STATUS',
+            key: 'status',
             align: 'center',
-            render: () => (
-                <Button size="small" icon={<Edit3 size={12} />} style={{ fontSize: '11px', color: '#475569' }}>
-                    Edit
-                </Button>
+            width: 100,
+            render: (_: unknown, record: SalesOrderLine) => (
+                record ? (
+                    <Tag color="success" style={{ borderRadius: '12px', fontSize: '11px', fontWeight: 600 }}>
+                        Allocated
+                    </Tag>
+                ) : "-"
             ),
         },
     ];
 
-    // Nested columns — properly typed
-    const nestedColumns: TableColumnsType<SalesOrderLine> = [
-        {
-            title: 'DA NUMBER',
-            dataIndex: 'ORDER_NUMBER',
-            key: 'daNum',
-            render: (num: number | null) => <span style={{ color: '#7c3aed', fontWeight: 500 }}>DA-2026-0{num}</span>,
-        },
-        { title: 'CUSTOMER ENTITY', dataIndex: 'CUSTOMER_NAME', key: 'custName' },
-        {
-            title: 'DA DATE',
-            dataIndex: 'ORDER_ENTERED_DATE',
-            key: 'daDate',
-            render: (text: string | null) => <span style={{ color: '#94a3b8' }}>{text}</span>,
-        },
-        { title: 'DA QTY', dataIndex: 'QUANTITY', key: 'daQty', align: 'right' },
-        {
-            title: 'ALLOCATED',
-            dataIndex: 'QUANTITY',
-            key: 'childAlloc',
-            align: 'right',
-            render: (val: number | null) => <span style={{ color: '#10b981', fontWeight: 500 }}>{val}</span>,
-        },
-        {
-            title: 'STATUS',
-            key: 'childStatus',
-            align: 'center',
-            render: () => <Tag color="success" style={{ fontSize: '10px' }}>Fulfilled</Tag>,
-        },
-    ];
+    if (error) {
+        return (
+            <div style={{ padding: '24px', textAlign: 'center', color: '#ef4444' }}>
+                <p>Failed to load fulfillment data.</p>
+                <p style={{ fontSize: '12px', color: '#94a3b8' }}>{error}</p>
+            </div>
+        );
+    }
+
+    // Show "Not yet" message when no SO data
+    const expandedRowRender = (record: AllocationFulfillment) => {
+        console.log(`Rendering expanded row for lineId ${record.lineId}:`, record.salesOrderLines);
+
+        if (!record.salesOrderLines || record.salesOrderLines.length === 0) {
+            return (
+                <div style={{
+                    padding: '24px 48px',
+                    backgroundColor: '#f8fafc',
+                    borderLeft: '4px solid #94a3b8',
+                    textAlign: 'center',
+                    color: '#94a3b8',
+                    fontStyle: 'italic'
+                }}>
+                    <span style={{ fontSize: '13px' }}>No sales order allocations yet</span>
+                </div>
+            );
+        }
+
+        return (
+            <div style={{ padding: '16px 16px 16px 48px', backgroundColor: '#f8fafc', borderLeft: '4px solid #2563eb' }}>
+                <DynamicGrid<SalesOrderLine>
+                    columns={soLineColumns}
+                    dataSource={record.salesOrderLines}
+                    enableSearch={false}
+                    pagination={false}
+                    size="small"
+                    bordered
+                    rowKey="soId"
+                />
+            </div>
+        );
+    };
 
     return (
-        <div style={{ padding: '24px', backgroundColor: '#f8fafc', minHeight: '100vh', fontFamily: 'sans-serif' }}>
-            {/* Header */}
-            <div style={{
-                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                backgroundColor: '#ffffff', padding: '16px', border: '1px solid #e2e8f0',
-                borderBottom: 'none', borderTopLeftRadius: '8px', borderTopRightRadius: '8px',
-                boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
-            }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                    <h1 style={{ margin: 0, fontSize: '15px', fontWeight: 600, color: '#334155' }}>Fulfillment Tracker</h1>
-                    <Tag color="default" style={{ margin: 0, borderRadius: '4px', color: '#64748b' }}>
-                        {latestProductionLines.length} line(s)
-                    </Tag>
-                </div>
-                <Button type="primary" size="small" style={{ backgroundColor: '#2563eb', fontSize: '12px', height: '30px' }}>
-                    All Items
-                </Button>
+        <>
+            <div className="dashboard-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+                <Space direction="vertical" size={2}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <BoxesIcon size={24} style={{ color: 'var(--primary-color)' }} />
+                        <Title level={4} style={{ margin: 0, color: 'var(--text-primary)' }}>Fulfillment Tracker</Title>
+                    </div>
+                </Space>
             </div>
-
-            {/* Master Table */}
-            <Table<ProductionLine>
-                dataSource={latestProductionLines}
-                rowKey="LINE_ID"
-                pagination={false}
-                bordered
-                style={{ boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.05)' }}
-                rowClassName={(record) => expandedRowKeys.includes(record.LINE_ID) ? 'bg-blue-50/20' : ''}
+            <DynamicGrid<AllocationFulfillment>
                 columns={mainColumns}
+                dataSource={filteredData}
+                loading={loading}
+                searchPlaceholder="Search by item, customer, org code..."
+                extraHeaderActions={
+                    <Space style={{ gap: '12px' }}>
+                        <span style={{ fontSize: '14px', fontWeight: 600, color: '#334155' }}>
+                            Total ({filteredData.length})
+                        </span>
+
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', paddingLeft: '12px', borderLeft: '1px solid #e2e8f0' }}>
+                            <Select
+                                placeholder="Status"
+                                value={statusFilter}
+                                onChange={setStatusFilter}
+                                allowClear
+                                style={{ width: 120 }}
+                                options={[
+                                    { label: 'Open', value: 'open' },
+                                    { label: 'Partial', value: 'partial' },
+                                    { label: 'Fulfilled', value: 'fulfilled' },
+                                ]}
+                            />
+
+                            <Select
+                                placeholder="Organization"
+                                value={orgFilter}
+                                onChange={setOrgFilter}
+                                allowClear
+                                style={{ width: 120 }}
+                                options={orgOptions}
+                            />
+
+                            <Select
+                                placeholder="Approval"
+                                value={approvalFilter}
+                                onChange={setApprovalFilter}
+                                allowClear
+                                style={{ width: 120 }}
+                                options={[
+                                    { label: 'Approved', value: 'Y' },
+                                    { label: 'Pending', value: 'N' }
+                                ]}
+                            />
+
+                            {(statusFilter || orgFilter || approvalFilter) && (
+                                <Button
+                                    type="text"
+                                    size="small"
+                                    onClick={handleClearFilters}
+                                    style={{ color: '#ef4444', padding: '4px' }}
+                                    icon={<X size={16} />}
+                                />
+                            )}
+                        </div>
+                    </Space>
+                }
+                rowKey="lineId"
                 expandable={{
                     expandedRowKeys,
                     onExpand: handleExpand,
-                    rowExpandable: (record) => (record.salesOrderLines?.length ?? 0) > 0,
-                    expandedRowRender: (record) => {
-                        return (
-                            <div style={{ padding: '16px 16px 16px 48px', backgroundColor: '#f8fafc', borderLeft: '4px solid #2563eb' }}>
-                                <Table<SalesOrderLine>
-                                    dataSource={record.salesOrderLines}
-                                    rowKey="SO_ID"
-                                    pagination={false}
-                                    size="small"
-                                    bordered
-                                    columns={nestedColumns}
-                                />
-                            </div>
-                        );
-                    },
+                    rowExpandable: () => true,
+                    expandedRowRender,
                 }}
             />
-        </div>
+        </>
     );
 }

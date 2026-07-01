@@ -171,4 +171,35 @@ public sealed class AllocationService(IDynamicQueryExecutor dynamicQuery) : IAll
         => _queryExecutor.QuerySingleOrDefaultAsync<dynamic>(
             Queries.GetCurrentOrgDetails,
             cancellationToken: cancellationToken);
+
+    public async Task<IEnumerable<ProductionLineDto>> GetFulfillmentDataAsync(string currentUser)
+    {
+        var productionLinesResult = await _queryExecutor.QueryAsync<ProductionLineDto>(Queries.GetB3LinesQuery, new {currentUser});
+        var productionLines = productionLinesResult.ToList();
+
+        if (!productionLines.Any())
+        {
+            return Enumerable.Empty<ProductionLineDto>();
+        }
+
+        var b3LineIds = productionLines.Select(p => p.LineId).Distinct().ToArray();
+        var salesOrderLines = await _queryExecutor.QueryAsync<SalesOrderLineDto>(
+            Queries.GetSalesOrderLinesQuery,
+            new { B3LineIds = b3LineIds }
+        );
+
+        var soLinesByB3LineId = salesOrderLines
+            .GroupBy(so => so.B3LineId)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        foreach (var line in productionLines)
+        {
+            if (soLinesByB3LineId.TryGetValue(line.LineId, out var nestedLines))
+            {
+                line.SalesOrderLines = nestedLines;
+            }
+        }
+
+        return productionLines;
+    }
 }

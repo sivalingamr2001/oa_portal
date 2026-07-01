@@ -1,9 +1,7 @@
 import {
-  Button,
   Card,
   Col,
   message,
-  Modal,
   Row,
   Space,
   Statistic,
@@ -13,20 +11,19 @@ import {
   AlertTriangle,
   Clock,
   FileSpreadsheet,
-  History,
   TrendingUp
 } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 import { getAllocationSummary, type AllocationSummary } from '../api/allocationApi';
-import '../styles/Dashboard.css';
 import { useAuth } from '../context/AuthContext';
+import '../styles/Dashboard.css';
+import FulfillmentTracker from './TrackerPage';
 
 const { Title, Text } = Typography;
 
 export const Dashboard = () => {
-  const [historyModalVisible, setHistoryModalVisible] = useState(false);
   const [summaries, setSummaries] = useState<AllocationSummary[]>([]);
-  const { currentUser } = useAuth()
+  const { currentUser } = useAuth();
 
   const loadData = async () => {
     try {
@@ -63,7 +60,7 @@ export const Dashboard = () => {
   return (
     <div className="dashboard-container">
       <div className="dashboard-header">
-        <Space orientation="vertical" size={2}>
+        <Space direction="vertical" size={2}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <TrendingUp size={24} style={{ color: 'var(--primary-color)' }} />
             <Title level={2} style={{ margin: 0, color: 'var(--text-primary)' }}>B3 Dashboard</Title>
@@ -92,16 +89,6 @@ export const Dashboard = () => {
             />
           </Card>
         </Col>
-        {/* <Col xs={12} sm={12} md={6}>
-          <Card className="kpi-card" bordered={false}>
-            <Statistic
-              title="Total Approved Qty"
-              value={stats.approved}
-              valueStyle={{ color: 'var(--success-color)' }}
-              prefix={<CheckCircle size={20} color="var(--success-color)" style={{ marginRight: 8 }} />}
-            />
-          </Card>
-        </Col> */}
         <Col xs={12} sm={12} md={6}>
           <Card className="kpi-card" bordered={false}>
             <Statistic
@@ -114,24 +101,12 @@ export const Dashboard = () => {
         </Col>
       </Row>
 
-      {/* Revision History Modal */}
-      <Modal
-        title={
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <History size={18} style={{ color: 'var(--primary-color)' }} />
-            {/* <span>Line Revision History — Item: {historyItemCode}</span> */}
-          </div>
-        }
-        open={historyModalVisible}
-        onCancel={() => setHistoryModalVisible(false)}
-        footer={[
-          <Button key="close" onClick={() => setHistoryModalVisible(false)}>
-            Close
-          </Button>
-        ]}
-        width={500}
-      >
-      </Modal>
+      {/* Fulfillment Tracker Table */}
+      <Row gutter={[16, 16]}>
+        <Col span={24}>
+          <FulfillmentTracker currentUser={currentUser?.username || ''} />
+        </Col>
+      </Row>
     </div>
   );
-}
+};

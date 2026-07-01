@@ -1,15 +1,47 @@
 .app-sider {
-  /* Swapped out plain white/gray for your premium system sidebar tokens */
   background: var(--sidebar) !important; 
   border-right: 1px solid var(--sidebar-border);
-  max-height: 100vh;
-  overflow-y: auto;
+  height: 100vh; /* Changed from max-height to guarantee full layout viewport */
   position: fixed;
   left: 0;
   top: 0;
   bottom: 0;
   z-index: 100;
 }
+
+/* TARGET ANT DESIGN INTERNAL WRAPPER FOR SPACE-BETWEEN MECHANICS */
+.app-sider .ant-layout-sider-children {
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: space-between !important; /* Pushes header to top and footer to bottom */
+  height: 100% !important;
+}
+
+/* Allow the menu area to grow and scroll independently if it gets too long */
+.sidebar-menu {
+  border: none;
+  background: transparent;
+  margin-top: 16px;
+  flex: 1 !important; 
+  overflow-y: auto !important;
+  overflow-x: hidden;
+}
+
+/* Clean styling layout for the footer container */
+.sidebar-footer {
+  padding: 16px;
+  border-top: 1px solid var(--sidebar-border);
+  background: transparent;
+  width: 100%;
+}
+
+.sidebar-version {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
 
 .app-sider.ant-layout-sider-collapsed {
   width: 80px !important;
@@ -168,4 +200,75 @@
 
 .app-sider::-webkit-scrollbar-thumb:hover {
   background: var(--muted-foreground);
+}
+
+.app-sider {
+  background: var(--sidebar) !important; 
+  border-right: 1px solid var(--sidebar-border);
+  height: 100vh; /* Locked strict layout containment bounds */
+  max-height: 100vh;
+  position: fixed;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 100;
+  
+  /* Flex mechanics to arrange children vertically */
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+/* New: Handles the expanding/scrolling menu area */
+.sidebar-body {
+  flex: 1; 
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* New: Fixed footer at the absolute bottom of flex layout */
+.sidebar-footer {
+  flex-shrink: 0;
+  padding: 16px;
+  border-top: 1px solid var(--sidebar-border);
+  background: var(--sidebar);
+}
+
+.sidebar-version {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.version-text {
+  font-size: 12px;
+  font-weight: 500;
+  color: #64748b;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+/* Adjust layout alignment rules when sidebar collapses */
+.app-sider.ant-layout-sider-collapsed .sidebar-version {
+  flex-direction: column;
+  gap: 4px;
+}
+
+.app-sider.ant-layout-sider-collapsed .version-text {
+  font-size: 10px;
+}
+
+/* Clean up duplicate scroll assignments from the old configuration */
+.app-sider::-webkit-scrollbar {
+  width: 4px;
+}
+.sidebar-body::-webkit-scrollbar {
+  width: 4px;
+}
+.sidebar-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+.sidebar-body::-webkit-scrollbar-thumb {
+  background: var(--sidebar-border);
+  border-radius: 3px;
 }

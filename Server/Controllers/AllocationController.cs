@@ -213,4 +213,11 @@ public sealed class AllocationController(IAllocationService allocationService) :
         if (result == null) return NotFound("Organization details not found.");
         return Ok(result);
     }
+
+    [HttpGet("fulfillments")]
+    public async Task<ActionResult<IEnumerable<ProductionLineDto>>> GetFulfillmentDataAsync(string currentUser)
+    {
+        var result = await _allocationService.GetFulfillmentDataAsync(currentUser);
+        return Ok(result);
+    }
 }

@@ -60,6 +60,7 @@ export function DynamicGrid<RecordType extends object>({
         border: '1px solid #e2e8f0',
         overflow: 'hidden'
       }}
+      variant="outlined"
     >
       {(enableSearch || extraHeaderActions) && (
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 12, padding: '4px 4px 0 4px' }}>

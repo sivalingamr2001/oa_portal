@@ -245,6 +245,51 @@ interface CacheStore {
   timestamp: number;
 }
 
+// ============================================
+// Types for /api/Allocation/fulfillments
+// ============================================
+
+export interface SalesOrderLine {
+  soId: number;
+  b3LineId: number;
+  soLineId: number;
+  soLineNo: number;
+  orderNumber: number;
+  quantity: number;
+  orderEnteredDate: string;
+  inventoryItemId: number;
+  itemNo: string;
+  orgId: number;
+  customerId: number;
+  customerName: string;
+  creationDate: string;
+}
+
+export interface AllocationFulfillment {
+  headerId: number;
+  headerCode: string;
+  customerName: string;
+  remarks: string;
+  transactionDate: string;
+  createdBy: string;
+  lineId: number;
+  approvalFlag: string;
+  b3ApprovedQuantity: number;
+  b3Quantity: number;
+  oldRequestedQty: number;
+  inventoryItemId: number;
+  organizationId: number;
+  organizationCode: string;
+  itemCode: string;
+  itemDescription: string;
+  targetDate: string;
+  closureFlag: string;
+  revision: number;
+  parentLineId: number;
+  allocatedSoQuantity: number;
+  salesOrderLines: SalesOrderLine[];
+}
+
 // Stores cached responses by their URL endpoint key
 const apiCache: Record<string, CacheStore> = {};
 const CACHE_DURATION = 10 * 60 * 1000; // 10 minutes in milliseconds
@@ -520,6 +565,32 @@ export const getAllocationSummary = async (
     `${BIN_BASE}/summary`,
     { params: { currentUser } },
   );
+  return data;
+};
+
+/**
+ * Get all allocation fulfillments (header + lines joined).
+ * GET /api/Allocation/fulfillments
+ */
+export const getAllocationFulfillments = async (
+  currentUser: string,
+): Promise<AllocationFulfillment[]> => {
+  const cacheKey = `${BASE}/fulfillments?user=${currentUser}`;
+  const cached = apiCache[cacheKey];
+  const now = Date.now();
+
+  // Return data if cache exists and is fresh
+  if (cached && now - cached.timestamp < CACHE_DURATION) {
+    return cached.data;
+  }
+
+  // Pass the user string safely as a URL query string parameter to your C# Controller backend
+  const { data } = await axiosClient.get<AllocationFulfillment[]>(BASE + '/fulfillments', {
+    params: { currentUser },
+  });
+
+  // Save to user-isolated cache space
+  apiCache[cacheKey] = { data, timestamp: now };
   return data;
 };
 

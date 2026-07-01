@@ -595,4 +595,87 @@ public static class Queries
                     WHERE MRP_RUN_STATUS = 1
                 )
           )";
+
+    public const string GetB3LinesQuery = @"
+            SELECT 
+                h.HEADER_ID AS HeaderId,
+                h.HEADER_CODE AS HeaderCode,
+                TRIM(cust_pri.customer_name) AS CustomerName,
+                TRIM(h.REMARKS) AS Remarks,
+                TO_CHAR(h.TRANSACTION_DATE, 'YYYY-MM-DD') AS TransactionDate,
+                TRIM(h.CREATED_BY) AS CreatedBy,
+                l.LineId,
+                l.ApprovalFlag,
+                l.B3ApprovedQuantity,
+                l.B3Quantity,
+                l.OldRequestedQty, 
+                l.InventoryItemId,
+                l.OrganizationId,
+                l.OrganizationCode,
+                l.ItemCode,
+                l.ItemDescription,
+                l.TargetDate,
+                l.ClosureFlag,
+                l.Revision,
+                l.ParentLineId,
+                l.AllocatedSoQuantity
+            FROM JAN_B3_HEADER h
+            LEFT JOIN (
+                SELECT 
+                    d.LineId, d.HEADER_ID, d.ApprovalFlag, d.B3ApprovedQuantity, d.B3Quantity,
+                    d.OldRequestedQty, d.InventoryItemId, d.OrganizationId, d.OrganizationCode,
+                    d.ItemCode, d.ItemDescription, d.TargetDate, d.ClosureFlag, d.Revision,
+                    d.ParentLineId, so_agg.AllocatedSoQuantity,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY d.HEADER_ID, d.RootLineId 
+                        ORDER BY d.Revision DESC, d.LineId DESC
+                    ) AS rn
+                FROM (
+                    SELECT 
+                        lines.LINE_ID AS LineId, lines.HEADER_ID, TRIM(lines.APPROVAL_FLAG) AS ApprovalFlag,
+                        lines.B3_APPROVED_QUANTITY AS B3ApprovedQuantity, lines.B3_QUANTITY AS B3Quantity,
+                        LAG(lines.B3_QUANTITY, 1) OVER (
+                            PARTITION BY lines.HEADER_ID, CONNECT_BY_ROOT lines.LINE_ID 
+                            ORDER BY lines.REVISION ASC, lines.LINE_ID ASC
+                        ) AS OldRequestedQty,
+                        lines.INVENTORY_ITEM_ID AS InventoryItemId, lines.ORGANIZATION_ID AS OrganizationId,
+                        TRIM(org.ORGANIZATION_CODE) AS OrganizationCode, TRIM(itm.SEGMENT1) AS ItemCode, 
+                        TRIM(itm.DESCRIPTION) AS ItemDescription, TO_CHAR(lines.TARGET_DATE, 'YYYY-MM-DD') AS TargetDate,
+                        TRIM(lines.CLOSURE_FLAG) AS ClosureFlag, lines.REVISION AS Revision,
+                        lines.PARENT_LINE_ID AS ParentLineId, CONNECT_BY_ROOT lines.LINE_ID AS RootLineId
+                    FROM JAN_B3_LINES lines
+                    LEFT JOIN ORG_ORGANIZATION_DEFINITIONS org ON lines.ORGANIZATION_ID = org.ORGANIZATION_ID
+                    LEFT JOIN MTL_SYSTEM_ITEMS itm ON lines.INVENTORY_ITEM_ID = itm.INVENTORY_ITEM_ID 
+                                                  AND lines.ORGANIZATION_ID = itm.ORGANIZATION_ID
+                    START WITH lines.PARENT_LINE_ID IS NULL
+                    CONNECT BY PRIOR lines.LINE_ID = lines.PARENT_LINE_ID
+                ) d
+                LEFT JOIN (
+                    SELECT B3_LINE_ID, SUM(QUANTITY) AS AllocatedSoQuantity
+                    FROM JAN_BE_VS_SO_TAB
+                    GROUP BY B3_LINE_ID
+                ) so_agg ON so_agg.B3_LINE_ID = d.LineId
+            ) l ON h.HEADER_ID = l.HEADER_ID AND l.rn = 1
+            LEFT JOIN ra_customers cust_pri ON h.CUSTOMER_ID = cust_pri.customer_id
+            WHERE l.LineId IS NOT NULL AND :currentUser IN ('JANHPL', 'HO') OR h.CREATED_BY = :currentUser
+            ORDER BY h.CREATED_DATE ASC";
+
+    public const string GetSalesOrderLinesQuery = @"
+            SELECT
+                SO_ID AS SoId,
+                B3_LINE_ID AS B3LineId,
+                SO_LINE_ID AS SoLineId,
+                SO_LINE_NO AS SoLineNo,
+                ORDER_NUMBER AS OrderNumber,
+                QUANTITY AS Quantity,
+                TO_CHAR(ORDER_ENTERED_DATE, 'YYYY-MM-DD') AS OrderEnteredDate,
+                INVENTORY_ITEM_ID AS InventoryItemId,
+                ITEM_NO AS ItemNo,
+                ORG_ID AS OrgId,
+                CUSTOMER_ID AS CustomerId,
+                TRIM(CUSTOMER_NAME) AS CustomerName,
+                TO_CHAR(CREATION_DATE, 'YYYY-MM-DD') AS CreationDate
+            FROM JAN_BE_VS_SO_TAB
+            WHERE B3_LINE_ID IN :B3LineIds
+            ORDER BY ORDERENTEREDDATE ASC";
 }

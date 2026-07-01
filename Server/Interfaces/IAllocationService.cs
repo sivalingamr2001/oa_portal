@@ -134,4 +134,11 @@ public interface IAllocationService
     /// <returns>A task representing the asynchronous operation, containing the dynamic context data of the active organization, or null if unassigned.</returns>
     Task<dynamic?> GetCurrentOrgAsync(CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Fetches the latest revision of each B3 production line, aggregates
+    /// the allocated sales order quantities, and nests the detailed
+    /// sales order lines for the fulfillment tracker.
+    /// </summary>
+    /// <returns>A list of ProductionLineDto objects.</returns>
+    Task<IEnumerable<ProductionLineDto>> GetFulfillmentDataAsync(string currentUser);
 }
