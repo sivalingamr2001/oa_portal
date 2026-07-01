@@ -38,6 +38,8 @@ export interface ProductionLine {
     ITEM_NAME_DISPLAY?: string;
     REGION_DISPLAY?: string;
     ITEM_CODE?: string;
+    allocatedSoQuantity?: number;
+    salesOrderLines?: SalesOrderLine[];
 }
 
 // --- MOCK DATA ---
@@ -46,32 +48,35 @@ const mockProductionData: ProductionLine[] = [
         LINE_ID: 501, HEADER_ID: 3001, ORGANIZATION_ID: 11, INVENTORY_ITEM_ID: 9001, B3_QUANTITY: 480,
         TARGET_DATE: '2026-12-01', B3_APPROVED_QUANTITY: 400, APPROVAL_FLAG: 'Y', APPROVED_DATE: '2026-11-01',
         APPROVED_BY: 'M_SMITH', CLOSURE_FLAG: 'N', REVISION: 1, PARENT_LINE_ID: null, AMENDMENT_REASON: 'Initial',
-        ITEM_NAME_DISPLAY: 'PCB Assembly Rev3', REGION_DISPLAY: 'Maharashtra', ITEM_CODE: 'PCB-001'
+        ITEM_NAME_DISPLAY: 'PCB Assembly Rev3', REGION_DISPLAY: 'Maharashtra', ITEM_CODE: 'PCB-001',
+        allocatedSoQuantity: 0, salesOrderLines: []
     },
     {
         LINE_ID: 502, HEADER_ID: 3001, ORGANIZATION_ID: 11, INVENTORY_ITEM_ID: 9001, B3_QUANTITY: 480,
         TARGET_DATE: '2026-12-01', B3_APPROVED_QUANTITY: 420, APPROVAL_FLAG: 'Y', APPROVED_DATE: '2026-11-10',
         APPROVED_BY: 'M_SMITH', CLOSURE_FLAG: 'N', REVISION: 2, PARENT_LINE_ID: 501, AMENDMENT_REASON: 'Update',
-        ITEM_NAME_DISPLAY: 'PCB Assembly Rev3', REGION_DISPLAY: 'Maharashtra', ITEM_CODE: 'PCB-001'
+        ITEM_NAME_DISPLAY: 'PCB Assembly Rev3', REGION_DISPLAY: 'Maharashtra', ITEM_CODE: 'PCB-001',
+        allocatedSoQuantity: 0, salesOrderLines: []
     },
     {
         LINE_ID: 503, HEADER_ID: 3001, ORGANIZATION_ID: 11, INVENTORY_ITEM_ID: 9001, B3_QUANTITY: 480,
         TARGET_DATE: '2026-12-01', B3_APPROVED_QUANTITY: 450, APPROVAL_FLAG: 'Y', APPROVED_DATE: '2026-11-20',
         APPROVED_BY: 'M_SMITH', CLOSURE_FLAG: 'N', REVISION: 3, PARENT_LINE_ID: 501, AMENDMENT_REASON: 'Final',
-        ITEM_NAME_DISPLAY: 'PCB Assembly Rev3', REGION_DISPLAY: 'Maharashtra', ITEM_CODE: 'PCB-001'
+        ITEM_NAME_DISPLAY: 'PCB Assembly Rev3', REGION_DISPLAY: 'Maharashtra', ITEM_CODE: 'PCB-001',
+        allocatedSoQuantity: 450,
+        salesOrderLines: [
+            { SO_ID: 1, B3_LINE_ID: 503, SO_LINE_ID: 201, SO_LINE_NO: 1, ORDER_NUMBER: 20260421, QUANTITY: 200, ORDER_ENTERED_DATE: '2026-11-10', INVENTORY_ITEM_ID: 9001, ITEM_NO: 'PCB-001', ORG_ID: 11, CUSTOMER_ID: 88, CUSTOMER_NAME: 'ABC Electronics Ltd', CREATION_DATE: '2026-11-10' },
+            { SO_ID: 2, B3_LINE_ID: 503, SO_LINE_ID: 202, SO_LINE_NO: 2, ORDER_NUMBER: 20260438, QUANTITY: 150, ORDER_ENTERED_DATE: '2026-11-15', INVENTORY_ITEM_ID: 9001, ITEM_NO: 'PCB-001', ORG_ID: 11, CUSTOMER_ID: 88, CUSTOMER_NAME: 'ABC Electronics Ltd', CREATION_DATE: '2026-11-15' },
+            { SO_ID: 3, B3_LINE_ID: 503, SO_LINE_ID: 203, SO_LINE_NO: 3, ORDER_NUMBER: 20260445, QUANTITY: 100, ORDER_ENTERED_DATE: '2026-11-18', INVENTORY_ITEM_ID: 9001, ITEM_NO: 'PCB-001', ORG_ID: 11, CUSTOMER_ID: 88, CUSTOMER_NAME: 'ABC Electronics Ltd', CREATION_DATE: '2026-11-18' }
+        ]
     },
     {
         LINE_ID: 601, HEADER_ID: 3002, ORGANIZATION_ID: 11, INVENTORY_ITEM_ID: 9002, B3_QUANTITY: 10000,
         TARGET_DATE: '2026-12-05', B3_APPROVED_QUANTITY: 10000, APPROVAL_FLAG: 'Y', APPROVED_DATE: '2026-11-21',
         APPROVED_BY: 'J_DOE', CLOSURE_FLAG: 'Y', REVISION: 1, PARENT_LINE_ID: null, AMENDMENT_REASON: null,
-        ITEM_NAME_DISPLAY: 'Resistor 10K Ω 1%', REGION_DISPLAY: 'Maharashtra', ITEM_CODE: 'RES-010K'
+        ITEM_NAME_DISPLAY: 'Resistor 10K Ω 1%', REGION_DISPLAY: 'Maharashtra', ITEM_CODE: 'RES-010K',
+        allocatedSoQuantity: 0, salesOrderLines: []
     }
-];
-
-const mockSalesLines: SalesOrderLine[] = [
-    { SO_ID: 1, B3_LINE_ID: 503, SO_LINE_ID: 201, SO_LINE_NO: 1, ORDER_NUMBER: 20260421, QUANTITY: 200, ORDER_ENTERED_DATE: '2026-11-10', INVENTORY_ITEM_ID: 9001, ITEM_NO: 'PCB-001', ORG_ID: 11, CUSTOMER_ID: 88, CUSTOMER_NAME: 'ABC Electronics Ltd', CREATION_DATE: '2026-11-10' },
-    { SO_ID: 2, B3_LINE_ID: 503, SO_LINE_ID: 202, SO_LINE_NO: 2, ORDER_NUMBER: 20260438, QUANTITY: 150, ORDER_ENTERED_DATE: '2026-11-15', INVENTORY_ITEM_ID: 9001, ITEM_NO: 'PCB-001', ORG_ID: 11, CUSTOMER_ID: 88, CUSTOMER_NAME: 'ABC Electronics Ltd', CREATION_DATE: '2026-11-15' },
-    { SO_ID: 3, B3_LINE_ID: 503, SO_LINE_ID: 203, SO_LINE_NO: 3, ORDER_NUMBER: 20260445, QUANTITY: 100, ORDER_ENTERED_DATE: '2026-11-18', INVENTORY_ITEM_ID: 9001, ITEM_NO: 'PCB-001', ORG_ID: 11, CUSTOMER_ID: 88, CUSTOMER_NAME: 'ABC Electronics Ltd', CREATION_DATE: '2026-11-18' }
 ];
 
 export default function FulfillmentTracker() {
@@ -79,13 +84,16 @@ export default function FulfillmentTracker() {
 
     // Process latest revision per group
     const latestProductionLines = useMemo(() => {
-        const groups: Record<number, ProductionLine[]> = {};
+        const groups = new Map<number, ProductionLine[]>();
         mockProductionData.forEach(line => {
             const groupKey = line.PARENT_LINE_ID || line.LINE_ID;
-            if (!groups[groupKey]) groups[groupKey] = [];
-            groups[groupKey].push(line);
+            if (!groups.has(groupKey)) {
+                groups.set(groupKey, []);
+            }
+            groups.get(groupKey)!.push(line);
         });
-        return Object.values(groups).map(group =>
+
+        return Array.from(groups.values()).map(group =>
             group.reduce((latest, current) => (current.REVISION || 0) > (latest.REVISION || 0) ? current : latest)
         );
     }, []);
@@ -144,9 +152,9 @@ export default function FulfillmentTracker() {
             align: 'center',
             width: 150,
             render: (_: unknown, record: ProductionLine) => {
-                const qty = record.B3_QUANTITY || 0;
-                const allocated = record.B3_APPROVED_QUANTITY || 0;
-                const pct = qty > 0 ? Math.min(100, Math.round((allocated / qty) * 100)) : 0;
+                const approvedQty = record.B3_APPROVED_QUANTITY || 0;
+                const soAllocated = record.allocatedSoQuantity || 0;
+                const pct = approvedQty > 0 ? Math.min(100, Math.round((soAllocated / approvedQty) * 100)) : 0;
                 return (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingLeft: '8px' }}>
                         <span style={{ fontSize: '10px', fontWeight: 'bold', color: '#64748b', width: '28px', textAlign: 'right' }}>{pct}%</span>
@@ -160,11 +168,11 @@ export default function FulfillmentTracker() {
             key: 'status',
             align: 'center',
             render: (_: unknown, record: ProductionLine) => {
-                const allocated = record.B3_APPROVED_QUANTITY || 0;
-                const target = record.B3_QUANTITY || 0;
-                if (allocated === target && target > 0) return <Tag color="success" style={{ borderRadius: '12px' }}>Fulfilled</Tag>;
-                if (allocated > 0) return <Tag color="warning" style={{ borderRadius: '12px' }}>Partial</Tag>;
-                return <Tag color="default" style={{ borderRadius: '12px' }}>Pending</Tag>;
+                const approved = record.B3_APPROVED_QUANTITY || 0;
+                const soAllocated = record.allocatedSoQuantity || 0;
+                if (soAllocated >= approved && approved > 0) return <Tag color="success" style={{ borderRadius: '12px' }}>Fulfilled</Tag>;
+                if (soAllocated > 0) return <Tag color="warning" style={{ borderRadius: '12px' }}>Partial</Tag>;
+                return <Tag color="default" style={{ borderRadius: '12px' }}>Open</Tag>;
             },
         },
         {
@@ -242,13 +250,12 @@ export default function FulfillmentTracker() {
                 expandable={{
                     expandedRowKeys,
                     onExpand: handleExpand,
-                    rowExpandable: (record) => mockSalesLines.some(child => child.B3_LINE_ID === record.LINE_ID),
+                    rowExpandable: (record) => (record.salesOrderLines?.length ?? 0) > 0,
                     expandedRowRender: (record) => {
-                        const children = mockSalesLines.filter(child => child.B3_LINE_ID === record.LINE_ID);
                         return (
                             <div style={{ padding: '16px 16px 16px 48px', backgroundColor: '#f8fafc', borderLeft: '4px solid #2563eb' }}>
                                 <Table<SalesOrderLine>
-                                    dataSource={children}
+                                    dataSource={record.salesOrderLines}
                                     rowKey="SO_ID"
                                     pagination={false}
                                     size="small"
