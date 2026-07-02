@@ -1,17 +1,15 @@
 import {
-  Card,
   Col,
   message,
   Row,
   Space,
-  Statistic,
   Typography
 } from 'antd';
 import {
   AlertTriangle,
   Clock,
   FileSpreadsheet,
-  TrendingUp
+  LayoutDashboard
 } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 import { getAllocationSummary, type AllocationSummary } from '../api/allocationApi';
@@ -19,7 +17,7 @@ import { useAuth } from '../context/AuthContext';
 import '../styles/Dashboard.css';
 import FulfillmentTracker from './TrackerPage';
 
-const { Title, Text } = Typography;
+const { Title } = Typography;
 
 export const Dashboard = () => {
   const [summaries, setSummaries] = useState<AllocationSummary[]>([]);
@@ -62,8 +60,8 @@ export const Dashboard = () => {
       <div className="dashboard-header">
         <Space direction="vertical" size={2}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <TrendingUp size={24} style={{ color: 'var(--primary-color)' }} />
-            <Title level={2} style={{ margin: 0, color: 'var(--text-primary)' }}>B3 Dashboard</Title>
+            <LayoutDashboard size={24} style={{ color: 'var(--primary-color)' }} />
+            <Title level={3} style={{ margin: 0, color: 'var(--text-primary)' }}>B3 Dashboard & Fulfillment Tracker</Title>
           </div>
           {/* <Text type="secondary">Monitor B3 transaction status, request quantity revisions, and review approvals</Text> */}
         </Space>

@@ -9,9 +9,13 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 28px;
   flex-wrap: wrap;
   gap: 16px;
+  position: sticky;
+  top: 0;
+  z-index: 15;
+  background: var(--bg-surface, #ffffff);
+  padding: 16px 0;
 }
 
 /* KPI Cards styling */

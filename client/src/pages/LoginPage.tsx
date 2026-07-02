@@ -72,7 +72,7 @@ export const LoginPage = () => {
           form={form}
           name="login_form"
           layout="vertical"
-          initialValues={{ username: "CBE25225", password: "cbe2janatics" }}
+          initialValues={{ username: "", password: "" }}
           onFinish={onFinish}
           requiredMark={false}
         >

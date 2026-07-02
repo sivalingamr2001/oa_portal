@@ -456,15 +456,37 @@ export const Approvals = () => {
       {
         title: 'Approved Qty Input',
         key: 'approvedQtyInput',
-        render: (_: any, row: ApiAllocationRow) => (
-          <InputNumber
-            min={1}
-            max={row.allocation.b3Quantity}
-            value={approvedQuantities[row.allocation.lineId] ?? row.allocation.b3Quantity}
-            onChange={(val) => setApprovedQuantities({ ...approvedQuantities, [row.allocation.lineId]: val || 0 })}
-            style={{ width: 100, borderRadius: 6 }}
-          />
-        )
+        render: (_: any, row: ApiAllocationRow) => {
+          const maxLimit = row.allocation.b3Quantity;
+          const lineId = row.allocation.lineId;
+
+          return (
+            <InputNumber
+              min={1}
+              value={approvedQuantities[lineId] ?? maxLimit}
+              style={{ width: 100, borderRadius: 6 }}
+              onChange={(val) => {
+                const numValue = val || 0;
+
+                if (numValue > maxLimit) {
+                  message.warning(`Cannot exceed max quantity of ${maxLimit}!`);
+
+                  setApprovedQuantities({
+                    ...approvedQuantities,
+                    [lineId]: maxLimit
+                  });
+                  return;
+                }
+
+                // Otherwise save valid input changes normally
+                setApprovedQuantities({
+                  ...approvedQuantities,
+                  [lineId]: numValue
+                });
+              }}
+            />
+          );
+        }
       },
       {
         title: 'Remarks',
@@ -478,12 +500,13 @@ export const Approvals = () => {
           const line = row.allocation;
           return (
             <Space>
-              <Tooltip title="Approve Line">
+              <Tooltip title="Approve Line" placement="top">
                 <Button
-                  type="text"
-                  className="action-btn-approve"
-                  icon={<Check size={18} color="var(--success-color)" />}
                   onClick={() => handleApproveLine(line.lineId, line.b3Quantity)}
+                  type="primary"
+                  size="small"
+                  icon={<Check size={14} />}
+                  style={{ borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                 />
               </Tooltip>
 
@@ -569,11 +592,12 @@ export const Approvals = () => {
                   </Space>
                 }
               >
-                <Tooltip title="Cancel Line">
+                <Tooltip title="Cancel Line" placement="top" mouseLeaveDelay={0}>
                   <Button
-                    type="text"
                     danger
-                    icon={<X size={18} />}
+                    size="small"
+                    icon={<X size={14} />}
+                    style={{ borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                   />
                 </Tooltip>
               </Popover>

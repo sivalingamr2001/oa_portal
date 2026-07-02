@@ -1,0 +1,68 @@
+/* FulfillmentTracker custom styles */
+
+.main-table-row {
+    transition: background-color 0.2s;
+}
+
+.main-table-row:hover {
+    background-color: #f8fafc !important;
+}
+
+.main-table-row .ant-table-cell {
+    padding: 10px 12px !important;
+    border-bottom: 1px solid #f1f5f9 !important;
+}
+
+.sub-table-row .ant-table-cell {
+    padding: 8px 12px !important;
+    border-bottom: 1px solid #e2e8f0 !important;
+    background-color: transparent !important;
+}
+
+.sub-table-row:hover .ant-table-cell {
+    background-color: #e0f2fe !important;
+}
+
+/* Antd Table overrides for cleaner look */
+.ant-table-small .ant-table-thead > tr > th {
+    background-color: #f8fafc !important;
+    color: #64748b !important;
+    font-weight: 600 !important;
+    font-size: 11px !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.5px !important;
+    padding: 8px 12px !important;
+    border-bottom: 2px solid #e2e8f0 !important;
+}
+
+.ant-table-small .ant-table-tbody > tr:last-child > td {
+    border-bottom: none !important;
+}
+
+/* Progress bar styling */
+.ant-progress-bg {
+    border-radius: 4px !important;
+}
+
+.ant-progress-inner {
+    border-radius: 4px !important;
+    background-color: #e2e8f0 !important;
+}
+
+/* Tag styling */
+.ant-tag {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+}
+
+/* Checkbox styling */
+.ant-checkbox-inner {
+    border-radius: 4px !important;
+    border-color: #cbd5e1 !important;
+}
+
+.ant-checkbox-checked .ant-checkbox-inner {
+    background-color: #0ea5e9 !important;
+    border-color: #0ea5e9 !important;
+}
