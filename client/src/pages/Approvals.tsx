@@ -88,6 +88,11 @@ export const Approvals = () => {
       return;
     }
 
+    if (qty > requestedQty) {
+      message.error(`Approved quantity (${qty}) cannot exceed the requested quantity (${requestedQty}).`);
+      return;
+    }
+
     try {
       await approveLine({
         lineId,
@@ -454,6 +459,7 @@ export const Approvals = () => {
         render: (_: any, row: ApiAllocationRow) => (
           <InputNumber
             min={1}
+            max={row.allocation.b3Quantity}
             value={approvedQuantities[row.allocation.lineId] ?? row.allocation.b3Quantity}
             onChange={(val) => setApprovedQuantities({ ...approvedQuantities, [row.allocation.lineId]: val || 0 })}
             style={{ width: 100, borderRadius: 6 }}

@@ -125,6 +125,13 @@ export const Fulfillment: React.FC = () => {
       return;
     }
 
+    const line = rawData.find(l => l.lineId === lineId);
+    if (line && qty > line.b3Quantity) {
+      message.error(`Revision quantity (${qty}) cannot exceed the requested quantity (${line.b3Quantity}).`);
+      setActiveReviseLineId(null);
+      return;
+    }
+
     try {
       await reviseQuantity({
         originalLineId: lineId,
@@ -374,6 +381,7 @@ export const Fulfillment: React.FC = () => {
                   <div style={{ fontSize: '12px', fontWeight: 500, marginBottom: 4 }}>New Quantity</div>
                   <InputNumber
                     min={1}
+                    max={line.b3Quantity}
                     value={revisionQty}
                     onChange={(val) => setRevisionQty(val || 0)}
                     style={{ width: '100%', borderRadius: 4 }}
