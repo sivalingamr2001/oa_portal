@@ -26,7 +26,7 @@ import { useNotification } from '../context/NotificationContext';
 import { useLoader } from '../hooks/useLoader';
 import '../styles/Approvals.css';
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 const { Option } = Select;
 
 // API response wrapper type
@@ -616,6 +616,7 @@ export const Approvals = () => {
           <Text type="secondary" strong>Line Items Pending HOD Verification</Text>
         </div>
         <DynamicGrid
+          showSerialNumber={false}
           columns={childColumns as any}
           dataSource={pendingLines}
           enableSearch={false}
@@ -637,16 +638,6 @@ export const Approvals = () => {
 
   return (
     <div className="approvals-container">
-      <div className="approvals-header">
-        <Space direction="vertical" size={2}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <UserCheck size={24} style={{ color: 'var(--primary-color)' }} />
-            <Title level={2} style={{ margin: 0, color: 'var(--text-primary)' }}>Approvals</Title>
-          </div>
-          <Text type="secondary">Review requested quantities, adjust allocations, and authorize transactions</Text>
-        </Space>
-      </div>
-
       {parentHeaders.length === 0 ? (
         /* Polished Minimal Empty State Box Layout */
         <div className="empty-approvals-box">
@@ -659,6 +650,7 @@ export const Approvals = () => {
         </div>
       ) : (
         <DynamicGrid
+          title={`Pending Approvals (${parentHeaders.length})`}
           columns={parentColumns}
           dataSource={parentHeaders}
           searchPlaceholder="Search pending headers..."

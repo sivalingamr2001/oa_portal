@@ -157,22 +157,20 @@ public static class Queries
         FROM 
             MTL_SYSTEM_ITEMS 
         WHERE 
-            UPPER(SEGMENT1) LIKE UPPER(:Search) 
-            AND ORGANIZATION_ID = :OrgId";
+            UPPER(SEGMENT1) LIKE UPPER(:Search)";
 
     public const string GetDemandMetrics = @"
         SELECT 
-            SUM(PEND_QTY) AS ""OaPendingQuantity"",   
-            SUM(RSV_QTY) AS ""OaRsvQty"",
+            CASE WHEN RSV_SOURCE='ORDER' THEN  SUM(PEND_QTY)  ELSE 0   END OaPendingQuantity,
+            CASE WHEN RSV_SOURCE='ORDER' THEN   SUM(RSV_QTY) ELSE 0 END OaRsvQty,
             SUM(PICKED_QTY) AS ""OaPickedQty"",
             nvl((SELECT ROQ FROM JAN_CUSTOMER_REPLENISHMENT_T WHERE END_DATE IS NULL AND CUSTOMER_ID = A.BILL_TO_CUST_ID AND ORGANIZATION_ID = A.SHIP_FROM_ORG_ID AND INVENTORY_ITEM_ID = A.INVENTORY_ITEM_ID), 0) AS ""BinQty"",
             nvl((SELECT SUM(RSV_QTY-ISSUED_QTY) FROM JAN_BRSV_TBR_V WHERE CUSTOMER_ID = A.BILL_TO_CUST_ID AND ORGANIZATION_ID = A.SHIP_FROM_ORG_ID AND INVENTORY_ITEM_ID = A.INVENTORY_ITEM_ID), 0) AS ""BinRsvQty""
         FROM JAN_OA_BIN_DEMAND_RSV_N A
         WHERE BILL_TO_CUST_ID = :CustomerId 
           AND SHIP_FROM_ORG_ID = :OrganizationId 
-          AND ordered_date >= TO_DATE('01-apr-2021', 'dd-mon-yyyy') 
           AND INVENTORY_ITEM_ID = :InventoryItemId 
-        GROUP BY BILL_TO_CUST_ID, INVENTORY_ITEM_ID, SHIP_FROM_ORG_ID";
+        GROUP BY RSV_SOURCE, BILL_TO_CUST_ID, INVENTORY_ITEM_ID, SHIP_FROM_ORG_ID";
 
 
     /// <summary>
@@ -369,7 +367,7 @@ public static class Queries
         :currentUser IN ('JANHPL', 'HO')
     
         -- 2. If they are regular users, show only records where they match the creator
-        OR h.CREATED_BY = :currentUser
+        OR h.CREATED_BY = :currentUser ORDER BY h.CREATED_DATE DESC
         ";
 
     public const string GetAllAllocationsGroupedById = @"
@@ -600,6 +598,7 @@ public static class Queries
             SELECT 
                 h.HEADER_ID AS HeaderId,
                 h.HEADER_CODE AS HeaderCode,
+                h.REGION,
                 TRIM(cust_pri.customer_name) AS CustomerName,
                 TRIM(h.REMARKS) AS Remarks,
                 TO_CHAR(h.TRANSACTION_DATE, 'YYYY-MM-DD') AS TransactionDate,
@@ -658,7 +657,7 @@ public static class Queries
             ) l ON h.HEADER_ID = l.HEADER_ID AND l.rn = 1
             LEFT JOIN ra_customers cust_pri ON h.CUSTOMER_ID = cust_pri.customer_id
             WHERE l.LineId IS NOT NULL AND :currentUser IN ('JANHPL', 'HO') OR h.CREATED_BY = :currentUser
-            ORDER BY h.CREATED_DATE ASC";
+            ORDER BY h.CREATED_DATE DESC";
 
     public const string GetSalesOrderLinesQuery = @"
             SELECT
@@ -677,5 +676,16 @@ public static class Queries
                 TO_CHAR(CREATION_DATE, 'YYYY-MM-DD') AS CreationDate
             FROM JAN_BE_VS_SO_TAB
             WHERE B3_LINE_ID IN :B3LineIds
-            ORDER BY ORDERENTEREDDATE ASC";
+            ORDER BY ORDERENTEREDDATE DESC";
+
+    public const string GetOrganationIdByOperatingUnitIdAndInventoryId = @"
+        SELECT ORGANIZATION_ID AS ""organizationId"", ORGANIZATION_CODE AS ""organizationCode"" 
+        FROM ORG_ORGANIZATION_DEFINITIONS
+        WHERE ORGANIZATION_CODE = (SELECT  MAX(JAN_ORGCODE(ORGANIZATION_ID))
+            FROM MTL_SYSTEM_ITEMS WHERE  INVENTORY_ITEM_ID= :InventoryId  AND 
+        (Decode(Inventory_Item_Status_Code,'Active','1',0)+Decode(Customer_Order_Flag,'Y',1,0)+Decode(Customer_Order_Enabled_Flag,'Y',1,0)+
+        Decode(Shippable_Item_Flag,'Y',1,0)
+        +Decode(Invoiceable_Item_Flag,'Y',1,0)+Decode(Invoice_Enabled_Flag,'Y',1,0)+Decode(Reservable_Type,1,1,0))=7 AND ORGANIZATION_ID not in (644,664,764) 
+        and ORGANIZATION_ID IN (select ORGANIZATION_ID from org_organization_definitions where operating_unit= :OuId))
+    ";
 }

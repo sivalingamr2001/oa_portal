@@ -149,3 +149,14 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(0, 153, 255, 0.623);
 }
+
+/* Global table header styling */
+.ant-table-thead > tr > th {
+  background-color: var(--primary-color) !important;
+  color: var(--primary-foreground) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.ant-table-thead > tr > th .ant-table-cell-scrollbar {
+  background-color: transparent !important;
+}

@@ -56,6 +56,13 @@ public interface IDynamicQueryExecutor
         string? connectionString = null,
         CancellationToken cancellationToken = default);
 
+    Task<T?> QueryFirstOrDefaultAsync<T>(
+        string sql,
+        object? parameters = null,
+        IDbTransaction? transaction = null,
+        string? connectionString = null,
+        CancellationToken cancellationToken = default);
+
     /// <summary>
     /// Executes a SELECT query and returns the first row, or <c>default</c> when no row matches.
     /// Throws <see cref="InvalidOperationException"/> if more than one row is returned.
@@ -200,6 +207,49 @@ public sealed class DynamicQueryExecutor : IDynamicQueryExecutor
             throw;
         }
     }
+
+    /// <inheritdoc/>
+    public async Task<T?> QueryFirstOrDefaultAsync<T>(
+        string sql,
+        object? parameters = null,
+        IDbTransaction? transaction = null,
+        string? connectionString = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sql);
+
+        _logger.LogDebug("QueryFirstOrDefaultAsync<{Type}> START  SQL: {Sql}", typeof(T).Name, sql);
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+
+        try
+        {
+            if (transaction is not null)
+            {
+                var cmd = BuildCommand(sql, parameters, transaction, cancellationToken);
+                var result = await transaction.Connection!
+                    .QueryFirstOrDefaultAsync<T>(cmd).ConfigureAwait(false);
+
+                LogSuccess(sw, typeof(T).Name, nameof(QueryFirstOrDefaultAsync));
+                return result;
+            }
+
+            await using var connWrapper = await OpenAsync(connectionString, cancellationToken)
+                .ConfigureAwait(false);
+
+            var command = BuildCommand(sql, parameters, null, cancellationToken);
+            var row = await connWrapper.Connection.QueryFirstOrDefaultAsync<T>(command).ConfigureAwait(false);
+
+            LogSuccess(sw, typeof(T).Name, nameof(QueryFirstOrDefaultAsync));
+            return row;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "QueryFirstOrDefaultAsync<{Type}> FAILED  SQL: {Sql}",
+                typeof(T).Name, sql);
+            throw;
+        }
+    }
+
 
     /// <inheritdoc/>
     public async Task<T?> QuerySingleOrDefaultAsync<T>(

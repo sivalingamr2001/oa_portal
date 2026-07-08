@@ -141,4 +141,6 @@ public interface IAllocationService
     /// </summary>
     /// <returns>A list of ProductionLineDto objects.</returns>
     Task<IEnumerable<ProductionLineDto>> GetFulfillmentDataAsync(string currentUser);
+
+    Task<OrganizationDto> GetOrgIdByInventoryIdandOuId(int InventoryId, int OuId, CancellationToken cancellationToken = default);
 }

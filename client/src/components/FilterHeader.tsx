@@ -42,7 +42,7 @@ export const FilterHeader: React.FC<FilterHeaderProps> = ({
                 </Radio.Button>
 
                 <Radio.Button value="PENDING" style={getButtonStyle("PENDING")}>
-                    Pendings
+                    Pending
                 </Radio.Button>
 
                 <Radio.Button value="APPROVED" style={getButtonStyle("APPROVED")}>

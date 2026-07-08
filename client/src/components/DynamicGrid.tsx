@@ -1,12 +1,14 @@
-import React, { useState, useMemo } from 'react';
-import { Table, Input, Card, Space } from 'antd';
+import { Input, Space, Table } from 'antd';
 import type { ColumnsType, TableProps } from 'antd/es/table';
+import Title from 'antd/es/typography/Title';
 import { Search } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
 import '../styles/DynamicGridStyles.css';
 
 interface DynamicGridProps<RecordType>
   extends Omit<TableProps<RecordType>, 'columns' | 'dataSource' | 'title'> {
   title?: string; // Now seamlessly assignable as a string primitive!
+  customHeader?: React.ReactNode; // Now seamlessly assignable as a React node!
   columns: ColumnsType<RecordType>;
   dataSource: RecordType[];
   searchPlaceholder?: string;
@@ -17,6 +19,7 @@ interface DynamicGridProps<RecordType>
 
 export function DynamicGrid<RecordType extends object>({
   title,
+  customHeader,
   columns,
   dataSource,
   searchPlaceholder = 'Search...',
@@ -27,7 +30,7 @@ export function DynamicGrid<RecordType extends object>({
 }: DynamicGridProps<RecordType>) {
   const [searchText, setSearchText] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(50);
 
   const filteredData = useMemo(() => {
     if (!searchText) return dataSource;
@@ -59,20 +62,33 @@ export function DynamicGrid<RecordType extends object>({
     return [snoColumn, ...columns];
   }, [columns, currentPage, pageSize, showSerialNumber]);
 
+  const defaultScroll = { x: 'max-content', y: '55.5vh' };
+  const tableScroll = tableProps.scroll ?? defaultScroll;
+  const tableSticky = tableProps.sticky ?? (tableScroll && typeof tableScroll === 'object' && 'y' in tableScroll ? true : undefined);
+
   return (
-    <Card
+    <div
       style={{
         borderRadius: 16,
         boxShadow: '0 4px 20px rgba(0, 0, 0, 0.05)',
         border: '1px solid #e2e8f0',
-        overflow: 'hidden'
+        overflow: 'hidden',
+        padding: '12px 16px',
+        backgroundColor: 'var(--bg-primary)',
       }}
-      variant="outlined"
+      
     >
-      <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 0 10px 0', }}>
         {title && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-            <h2 style={{ margin: 0, color: 'var(--text-primary)' }}>{title}</h2>
+          <div style={{ display: 'flex', alignItems: 'center', margin: 0 }}>
+            <Title level={4} style={{fontWeight: "bolder", fontFamily: "inherit"}}  >
+              {title}
+            </Title>
+          </div>
+        )}
+        {customHeader && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: 0 }}>
+            {customHeader}
           </div>
         )}
       </div>
@@ -105,24 +121,24 @@ export function DynamicGrid<RecordType extends object>({
         rowClassName={(_record, index) => {
           return index % 2 === 0 ? 'colorful-row-even' : 'colorful-row-odd';
         }}
+        scroll={tableScroll}
+        sticky={tableSticky}
         pagination={{
           size: "small",
           current: currentPage,
           pageSize: pageSize,
-          defaultPageSize: 10,
+          defaultPageSize: 50,
           showSizeChanger: true,
-          pageSizeOptions: ['5', '10', '20', '50'],
+          pageSizeOptions: ['50', '100', '200', '500'],
           showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} records`,
-          style: { marginTop: 16, paddingRight: 8 },
           onChange: (page, size) => {
             setCurrentPage(page);
             setPageSize(size);
           }
         }}
         rowKey={(record: any) => record.lineId || record.headerId || record.id || Math.random().toString()}
-        scroll={{ x: 'max-content', y: '55.5vh' }}
         {...tableProps}
       />
-    </Card>
+    </div>
   );
 }

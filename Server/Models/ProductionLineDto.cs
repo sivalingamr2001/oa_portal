@@ -5,6 +5,7 @@ public class ProductionLineDto
     // Header Information
     public int HeaderId { get; set; }
     public string? HeaderCode { get; set; }
+    public string Region { get; set; }
     public string? CustomerName { get; set; }
     public string? Remarks { get; set; }
     public string? TransactionDate { get; set; }

@@ -434,6 +434,26 @@ export const getOrganizations = async (): Promise<Organization[]> => {
 };
 
 /**
+ * GET /api/Allocation/organizations
+ * Get all organizations by inventory item ID and OU ID
+ */
+export const getOrganizationIdByInventoryItemIdAndOuId = async (
+  inventoryItemId: number,
+  ouId: number | null
+): Promise<Organization> => {
+  const { data } = await axiosClient.get<Organization>(
+    `${BASE}/organaztion-id-by-invetoryandOU`,
+    { 
+      params: { 
+        InventoryId: inventoryItemId, // Matches backend 'InventoryId'
+        OuId: ouId                   // Matches backend 'OuId'
+      } 
+    }
+  );
+  return data;
+};
+
+/**
  * GET /api/Allocation/organizations-by/{OuId}
  * Get organizations by OU ID
  */
@@ -453,11 +473,10 @@ export const getOrganizationsByOuId = async (
 export const getItems = async (
   page: number = 1,
   pageSize: number = 10,
-  search?: string,
-  orgId?: number,
+  search?: string
 ): Promise<PaginatedItems> => {
   const { data } = await axiosClient.get<PaginatedItems>(`${BASE}/items`, {
-    params: { page, pageSize, search, orgId },
+    params: { page, pageSize, search },
   });
   return data;
 };
@@ -467,9 +486,8 @@ export const getItems = async (
  */
 export const getItemByCode = async (
   itemCode: string,
-  organizationId?: number,
 ): Promise<InventoryItem> => {
-  const result = await getItems(1, 10, itemCode.trim(), organizationId);
+  const result = await getItems(1, 10, itemCode.trim());
   const normalized = itemCode.trim().toUpperCase();
   const item = result.data.find((i) => i.itemCode.toUpperCase() === normalized);
   if (!item) {

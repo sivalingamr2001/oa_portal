@@ -1,0 +1,18 @@
+/* Custom row striping */
+.colorful-row-even {
+  background-color: #ffffff !important;
+}
+.colorful-row-odd {
+  background-color: #f8fafc !important; /* Soft gray for odd rows */
+}
+
+/* Custom header cells */
+.ag-theme-quartz .custom-header-cell {
+  background-color: var(--primary) !important;
+  color: #ffffff !important;
+}
+
+/* S.No column centering */
+.ag-theme-quartz .sno-header-cell {
+  text-align: center;
+}

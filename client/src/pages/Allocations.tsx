@@ -15,10 +15,12 @@ import {
   Select,
   Space,
   Tag,
+  Tooltip,
   Typography
 } from 'antd';
-import { Database, FileText, MapPin, Plus, Save, Sparkles, Trash2, X } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import dayjs from 'dayjs';
+import { Database, FileText, MapPin, Plus, RefreshCcw, Save, Sparkles, Trash2, X } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type {
   Customer,
@@ -35,13 +37,12 @@ import {
   getDemandMetrics,
   getItems,
   getOperatingUnits,
-  getOrganizationsByOuId,
+  getOrganizationIdByInventoryItemIdAndOuId,
   getRegions,
   getRrsCategory,
   getShipToCustomers
 } from '../api/allocationApi';
 import { useAuth } from '../context/AuthContext';
-import { useNotification } from '../context/NotificationContext';
 import '../styles/Allocations.css';
 
 const { Title, Text } = Typography;
@@ -65,9 +66,26 @@ interface LineItemState {
   rrsError?: boolean;
 }
 
+const createEmptyLine = (id: string): LineItemState => ({
+  id,
+  organizationId: null,
+  inventoryItemId: null,
+  itemCode: '',
+  description: '',
+  week: '',
+  b3Quantity: 0,
+  targetDate: ''
+});
+
+const createLineId = () => {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+};
+
 export const Allocations = () => {
   const navigate = useNavigate();
-  const { addNotification } = useNotification();
   const [form] = Form.useForm();
   const { currentUser, currentRegion } = useAuth();
 
@@ -77,14 +95,24 @@ export const Allocations = () => {
     }
   }, [currentRegion]);
 
+  const disabledDate = (current: dayjs.Dayjs) => {
+    // Can not select days before today
+    const tooEarly = current && current < dayjs().startOf('day');
+
+    // Can not select days after 45 days from today
+    const tooLate = current && current > dayjs().endOf('day').add(45, 'days');
+
+    return !!tooEarly || !!tooLate;
+  };
+
   const [regions, setRegions] = useState<Region[]>([]);
   const [operatingUnits, setOperatingUnits] = useState<OperatingUnit[]>([]);
   const [billToCustomers, setBillToCustomers] = useState<Customer[]>([]);
   const [shipToCustomers, setShipToCustomers] = useState<Customer[]>([]);
   const [billToAddresses, setBillToAddresses] = useState<CustomerAddress[]>([]);
   const [shipToAddresses, setShipToAddresses] = useState<CustomerAddress[]>([]);
-  const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [items, setItems] = useState<InventoryItem[]>([]);
+  const [lineItems, setLineItems] = useState<Record<string, InventoryItem[]>>({});
   const [selectedRegion, setSelectedRegion] = useState<string>('');
   const [selectedSubRegion, setSelectedSubRegion] = useState<string>('');
   const [selectedOU, setSelectedOU] = useState<number | null>(null);
@@ -94,11 +122,65 @@ export const Allocations = () => {
   const [billToAddressDetail, setBillToAddressDetail] = useState<string>('');
   const [shipToAddressDetail, setShipToAddressDetail] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState<string>('');
-  const [lines, setLines] = useState<LineItemState[]>([
-    { id: '1', organizationId: null, inventoryItemId: null, itemCode: '', description: '', week: '', b3Quantity: 0, targetDate: '' }
-  ]);
+  const [lines, setLines] = useState<LineItemState[]>([createEmptyLine('1')]);
   const [loading, setLoading] = useState(false);
   const [activePanel, setActivePanel] = useState<string | string[]>(['header']);
+  const [organizationForSelectedItem, setOrganizationForSelectedItem] = useState<Organization | null>(null);
+  const [itemSearchLoading, setItemSearchLoading] = useState<Record<string, boolean>>({});
+  const itemSearchTimeouts = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+
+  useEffect(() => {
+    return () => {
+      Object.values(itemSearchTimeouts.current).forEach(timeout => clearTimeout(timeout));
+    };
+  }, []);
+
+  const loadItemsForLine = async (lineId: string, search: string) => {
+    const trimmedSearch = search.trim();
+    if (!trimmedSearch || trimmedSearch.length < 4) {
+      setLineItems(prev => ({ ...prev, [lineId]: [] }));
+      return;
+    }
+
+    setItemSearchLoading(prev => ({ ...prev, [lineId]: true }));
+    try {
+      const itemsData = await getItems(1, 50, trimmedSearch);
+      setLineItems(prev => ({ ...prev, [lineId]: itemsData.data }));
+    } catch (err) {
+      console.error('Failed to load items for line:', err);
+      setLineItems(prev => ({ ...prev, [lineId]: [] }));
+    } finally {
+      setItemSearchLoading(prev => ({ ...prev, [lineId]: false }));
+    }
+  };
+
+  const handleItemSearch = (lineId: string, value: string) => {
+    const trimmedValue = value.trim();
+
+    if (itemSearchTimeouts.current[lineId]) {
+      clearTimeout(itemSearchTimeouts.current[lineId]);
+    }
+
+    if (!trimmedValue || trimmedValue.length < 4) {
+      setLineItems(prev => ({ ...prev, [lineId]: [] }));
+      return;
+    }
+
+    itemSearchTimeouts.current[lineId] = window.setTimeout(() => {
+      void loadItemsForLine(lineId, trimmedValue);
+    }, 500);
+  };
+
+  const loadOrgIdForSelectedItem = async (inventoryItemId: number, selectedOU: number | null) => {
+    try {
+      const org: Organization = await getOrganizationIdByInventoryItemIdAndOuId(inventoryItemId, selectedOU);
+      setOrganizationForSelectedItem(org);
+      return org;
+    } catch (error) {
+      console.error('Failed to load organization for selected item:', error);
+      return null;
+    }
+  };
 
   useEffect(() => {
     const loadInitialData = async () => {
@@ -106,7 +188,7 @@ export const Allocations = () => {
         const [regionsData, ouData, itemsData] = await Promise.all([
           getRegions(),
           getOperatingUnits(),
-          getItems(1, 50, searchTerm, lines.find(l => l.organizationId)?.organizationId || undefined),
+          getItems(1, 50, searchTerm),
         ]);
         setRegions(regionsData);
         setOperatingUnits(ouData);
@@ -117,22 +199,6 @@ export const Allocations = () => {
     };
     loadInitialData();
   }, [searchTerm]);
-
-  useEffect(() => {
-    if (!selectedOU) {
-      setOrganizations([]);
-      return;
-    }
-    const loadOrganizations = async () => {
-      try {
-        const orgs = await getOrganizationsByOuId(selectedOU);
-        setOrganizations(orgs);
-      } catch (err) {
-        message.error('Failed to load organizations for selected operating unit.');
-      }
-    };
-    loadOrganizations();
-  }, [selectedOU]);
 
   const uniqueRegions = useMemo(() => {
     return Array.from(new Set(regions.map(r => r.region)));
@@ -229,16 +295,25 @@ export const Allocations = () => {
   };
 
   const addLineRow = () => {
-    const newId = (lines.length + 1).toString();
-    setLines([...lines, { id: newId, organizationId: null, inventoryItemId: null, itemCode: '', description: '', week: '', b3Quantity: 0, targetDate: '' }]);
+    setLines(prevLines => [...prevLines, createEmptyLine(createLineId())]);
   };
 
   const removeLineRow = (id: string) => {
-    if (lines.length === 1) {
-      message.warning('At least one line item is required.');
-      return;
-    }
-    setLines(lines.filter(l => l.id !== id));
+    setLines(prevLines => {
+      if (prevLines.length === 1) {
+        message.warning('At least one line item is required.');
+        return prevLines;
+      }
+      return prevLines.filter(l => l.id !== id);
+    });
+  };
+
+  const clearLineRow = (id: string) => {
+    setLines(prevLines =>
+      prevLines.map(line =>
+        line.id === id ? createEmptyLine(line.id) : line
+      )
+    );
   };
 
   const handleClearAll = () => {
@@ -262,9 +337,7 @@ export const Allocations = () => {
         setShipToAddresses([]);
         setBillToCustomers([]);
         setShipToCustomers([]);
-        setLines([
-          { id: '1', organizationId: null, inventoryItemId: null, itemCode: '', description: '', week: '', b3Quantity: 0, targetDate: '' }
-        ]);
+        setLines([createEmptyLine('1')]);
         setSearchTerm('');
         message.success('All fields have been cleared.');
       }
@@ -274,59 +347,70 @@ export const Allocations = () => {
   const clearLine = (id: string) => {
     setLines(prevLines =>
       prevLines.map(line =>
-        line.id === id
-          ? { id: line.id, organizationId: null, inventoryItemId: null, itemCode: '', description: '', week: '', b3Quantity: 0, targetDate: '' }
-          : line
+        line.id === id ? createEmptyLine(line.id) : line
       )
     );
   };
 
   const updateLineRow = async (id: string, field: keyof LineItemState, value: any) => {
-    const updated = await Promise.all(lines.map(async (line) => {
-      if (line.id !== id) return line;
-      const updatedLine = { ...line, [field]: value } as LineItemState;
-      if (field === 'inventoryItemId') {
-        const itemObj = items.find(i => i.inventoryItemId === value);
-        if (itemObj) {
-          updatedLine.itemCode = itemObj.itemCode;
-          updatedLine.description = itemObj.description;
-        }
-      }
-      if (
-        (field === 'inventoryItemId' || field === 'organizationId') &&
-        updatedLine.inventoryItemId &&
-        updatedLine.organizationId
-      ) {
-        try {
-          const rrs = await getRrsCategory(updatedLine.organizationId, updatedLine.inventoryItemId);
-          updatedLine.rrsCategory = rrs.rrsCategory;
-          updatedLine.rrsError = rrs.rrsCategory === 'Rn';
-          if (selectedBillToCustomer && !updatedLine.rrsError) {
-            const metrics = await getDemandMetrics(
-              selectedBillToCustomer,
-              updatedLine.organizationId,
-              updatedLine.inventoryItemId
-            );
-            updatedLine.oaPendingQuantity = metrics.oaPendingQuantity;
-            updatedLine.oaRsvQty = metrics.oaRsvQty;
-            updatedLine.oaPickedQty = metrics.oaPickedQty;
-            updatedLine.binQty = metrics.binQty;
-            updatedLine.binRsvQty = metrics.binRsvQty;
+    setLines(prevLines =>
+      prevLines.map(line => {
+        if (line.id !== id) return line;
+
+        const updatedLine = { ...line, [field]: value } as LineItemState;
+
+        if (field === 'inventoryItemId') {
+          const itemSource = lineItems[line.id] || items;
+          const itemObj = itemSource.find(i => i.inventoryItemId === value);
+          if (itemObj) {
+            updatedLine.itemCode = itemObj.itemCode;
+            updatedLine.description = itemObj.description;
+          } else {
+            updatedLine.itemCode = '';
+            updatedLine.description = '';
           }
-          if (updatedLine.rrsError) {
-            updatedLine.oaPendingQuantity = undefined;
-            updatedLine.oaRsvQty = undefined;
-            updatedLine.oaPickedQty = undefined;
-            updatedLine.binQty = undefined;
-            updatedLine.binRsvQty = undefined;
-          }
-        } catch (err) {
-          console.error('Failed to retrieve item metrics:', err);
         }
+
+        return updatedLine;
+      })
+    );
+  };
+
+  const loadLineMetrics = async (lineId: string, inventoryItemId: number, organizationId: number) => {
+    try {
+      const currentLine = lines.find(line => line.id === lineId);
+      if (!currentLine) return;
+
+      const rrs = await getRrsCategory(organizationId, inventoryItemId);
+      const nextLine = {
+        ...currentLine,
+        organizationId,
+        inventoryItemId,
+        rrsCategory: rrs.rrsCategory,
+        rrsError: rrs.rrsCategory === 'Rn'
+      } as LineItemState;
+
+      if (selectedBillToCustomer && !nextLine.rrsError) {
+        const metrics = await getDemandMetrics(selectedBillToCustomer, organizationId, inventoryItemId);
+        nextLine.oaPendingQuantity = metrics.oaPendingQuantity;
+        nextLine.oaRsvQty = metrics.oaRsvQty;
+        nextLine.oaPickedQty = metrics.oaPickedQty;
+        nextLine.binQty = metrics.binQty;
+        nextLine.binRsvQty = metrics.binRsvQty;
+      } else {
+        nextLine.oaPendingQuantity = undefined;
+        nextLine.oaRsvQty = undefined;
+        nextLine.oaPickedQty = undefined;
+        nextLine.binQty = undefined;
+        nextLine.binRsvQty = undefined;
       }
-      return updatedLine;
-    }));
-    setLines(updated);
+
+      setLines(currentLines =>
+        currentLines.map(existingLine => existingLine.id === lineId ? nextLine : existingLine)
+      );
+    } catch (err) {
+      console.error('Failed to retrieve item metrics:', err);
+    }
   };
 
   const handleSave = async () => {
@@ -365,8 +449,10 @@ export const Allocations = () => {
         }))
       };
       const result = await createAllocation(requestPayload);
-      addNotification(`Bin Allocation created successfully under Header ID: ${result.headerId}`, 'info');
-      navigate('/');
+      if (result) {
+        message.success(`Bin Allocation created successfully`);
+        navigate('/');
+      }
     } catch (err) {
       console.error(err);
       message.error('Failed to create Bin Allocation. Check form errors.');
@@ -705,25 +791,6 @@ export const Allocations = () => {
 
             {/* Added style width 100% */}
             <Row gutter={[16, 12]} align="bottom" style={{ width: '100%', margin: 0 }}>
-              {/* Changed md from 4 to 5 */}
-              <Col xs={24} sm={12} md={5}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <span className="field-label-custom">ORG</span>
-                  <Select
-                    placeholder="Select Org"
-                    value={line.organizationId}
-                    onChange={(val) => updateLineRow(line.id, 'organizationId', val)}
-                    style={{ width: '100%' }}
-                  >
-                    {organizations.map(org => (
-                      <Select.Option key={org.organizationId} value={org.organizationId}>
-                        {org.organizationCode}
-                      </Select.Option>
-                    ))}
-                  </Select>
-                </div>
-              </Col>
-
               {/* Kept md at 5 */}
               <Col xs={24} sm={12} md={5}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -731,17 +798,50 @@ export const Allocations = () => {
                   <Select
                     placeholder="Select Item"
                     value={line.inventoryItemId}
-                    onChange={(val) => updateLineRow(line.id, 'inventoryItemId', val)}
+                    onChange={async (val) => {
+                      updateLineRow(line.id, 'inventoryItemId', val);
+
+                      try {
+                        const orgData = await loadOrgIdForSelectedItem(val, selectedOU);
+
+                        if (orgData?.organizationId) {
+                          updateLineRow(line.id, 'organizationId', orgData.organizationId);
+                          await loadLineMetrics(line.id, val, orgData.organizationId);
+                        }
+                      } catch (error) {
+                        console.error('Failed to auto-select organization', error);
+                      }
+                    }}
                     style={{ width: '100%' }}
                     showSearch
+                    loading={!!itemSearchLoading[line.id]}
                     optionFilterProp="children"
-                    onSearch={(value) => setSearchTerm(value)}
+                    onSearch={(value) => handleItemSearch(line.id, value)}
                   >
-                    {items.map(item => (
+                    {(lineItems[line.id] || items).map(item => (
                       <Select.Option key={item.inventoryItemId} value={item.inventoryItemId}>
                         {item.itemCode}
                       </Select.Option>
                     ))}
+                  </Select>
+                </div>
+              </Col>
+
+              {/* ORG Dropdown */}
+              <Col xs={24} sm={12} md={4}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <span className="field-label-custom">ORG</span>
+                  <Select
+                    placeholder="Select Org"
+                    value={line.organizationId}
+                    onChange={(val) => updateLineRow(line.id, 'organizationId', val)} // Cleaned up
+                    style={{ width: '100%', maxWidth: 120 }}
+                  >
+                    {organizationForSelectedItem && (
+                      <Select.Option key={organizationForSelectedItem.organizationId} value={organizationForSelectedItem.organizationId}>
+                        {organizationForSelectedItem.organizationCode}
+                      </Select.Option>
+                    )}
                   </Select>
                 </div>
               </Col>
@@ -786,21 +886,42 @@ export const Allocations = () => {
                   <DatePicker
                     placeholder="Date"
                     style={{ width: '100%' }}
+                    disabledDate={disabledDate}
                     onChange={(_, dateString) => updateLineRow(line.id, 'targetDate', Array.isArray(dateString) ? dateString[0] : dateString)}
                   />
                 </div>
               </Col>
 
               {/* Changed md from 1 to 1 remaining to fulfill 24 total grid count */}
-              <Col xs={24} sm={12} md={1} style={{ display: 'flex', justifyContent: 'center' }}>
-                <Button
-                  danger
-                  type="text"
-                  icon={<Trash2 size={18} />}
-                  onClick={() => removeLineRow(line.id)}
-                  style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 40, width: '100%' }}
-                />
+              <Col
+                xs={24}
+                sm={12}
+                md={2} // Increased to md={2} so two buttons can fit comfortably side-by-side on desktop
+                style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}
+              >
+                <div style={{ display: 'flex', gap: '2px', width: '100%', justifyContent: 'center' }}>
+                  <Tooltip title="Clear Line">
+                    <Button
+                      danger
+                      type="text"
+                      icon={<RefreshCcw size={18} />}
+                      onClick={() => clearLineRow(line.id)}
+                      style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 40, width: 40 }}
+                    />
+                  </Tooltip>
+
+                  <Tooltip title="Delete Line">
+                    <Button
+                      danger
+                      type="text"
+                      icon={<Trash2 size={18} />}
+                      onClick={() => removeLineRow(line.id)}
+                      style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 40, width: 40 }}
+                    />
+                  </Tooltip>
+                </div>
               </Col>
+
             </Row>
 
             <div style={{ marginTop: 12 }}>

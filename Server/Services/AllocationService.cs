@@ -127,7 +127,7 @@ public sealed class AllocationService(IDynamicQueryExecutor dynamicQuery) : IAll
             cancellationToken: cancellationToken);
 
     public Task<DemandMetricsDto?> GetDemandMetricsAsync(int customerId, int organizationId, int inventoryItemId, CancellationToken cancellationToken = default)
-        => _queryExecutor.QuerySingleOrDefaultAsync<DemandMetricsDto>(
+        => _queryExecutor.QueryFirstOrDefaultAsync<DemandMetricsDto>(
             Queries.GetDemandMetrics,
             new { CustomerId = customerId, OrganizationId = organizationId, InventoryItemId = inventoryItemId },
             cancellationToken: cancellationToken);
@@ -174,7 +174,7 @@ public sealed class AllocationService(IDynamicQueryExecutor dynamicQuery) : IAll
 
     public async Task<IEnumerable<ProductionLineDto>> GetFulfillmentDataAsync(string currentUser)
     {
-        var productionLinesResult = await _queryExecutor.QueryAsync<ProductionLineDto>(Queries.GetB3LinesQuery, new {currentUser});
+        var productionLinesResult = await _queryExecutor.QueryAsync<ProductionLineDto>(Queries.GetB3LinesQuery, new { currentUser });
         var productionLines = productionLinesResult.ToList();
 
         if (!productionLines.Any())
@@ -202,4 +202,9 @@ public sealed class AllocationService(IDynamicQueryExecutor dynamicQuery) : IAll
 
         return productionLines;
     }
+
+    public Task<OrganizationDto> GetOrgIdByInventoryIdandOuId(int InventoryId, int OuId, CancellationToken cancellationToken = default)
+    => _queryExecutor.QuerySingleOrDefaultAsync<OrganizationDto>(
+        Queries.GetOrganationIdByOperatingUnitIdAndInventoryId, new { InventoryId, OuId },
+        cancellationToken: cancellationToken);
 }

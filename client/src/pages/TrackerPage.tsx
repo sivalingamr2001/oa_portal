@@ -1,7 +1,7 @@
 import { Button, Pagination, Progress, Select, Space, Table, Tag, Tooltip } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import Title from 'antd/es/typography/Title';
-import { BoxesIcon, CheckCircle2, ChevronDown, ChevronRight, X } from 'lucide-react';
+import { ArrowRightLeft, BoxesIcon, CheckCircle2, ChevronDown, ChevronRight, X } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import type { AllocationFulfillment, SalesOrderLine } from '../api/allocationApi';
 import { getAllocationFulfillments } from '../api/allocationApi';
@@ -60,11 +60,11 @@ const soLineColumns: ColumnsType<SalesOrderLine> = [
         title: 'OA NUMBER',
         dataIndex: 'orderNumber',
         key: 'orderNumber',
-        width: 140,
+        width: 120,
         render: (num: number) => (
             num !== null && num !== undefined ? (
                 <span style={{ color: '#7c3aed', fontWeight: 600, fontSize: '12px' }}>
-                    OA-{num}
+                    {num}
                 </span>
             ) : '-'
         ),
@@ -73,24 +73,22 @@ const soLineColumns: ColumnsType<SalesOrderLine> = [
         title: 'CUSTOMER',
         dataIndex: 'customerName',
         key: 'customerName',
-        width: 220,
+        width: 500,
         render: (name: string) => <span style={{ color: '#475569', fontWeight: 500, fontSize: '12px' }}>{name || '-'}</span>,
     },
     {
         title: 'OA DATE',
         dataIndex: 'orderEnteredDate',
         key: 'orderEnteredDate',
-        width: 120,
         render: (date: string) => (
             <span style={{ color: '#475569', fontSize: '12px' }}>{formatDateShort(date)}</span>
         ),
     },
     {
-        title: 'OA QTY',
+        title: 'B3 REQ QTY',
         dataIndex: 'quantity',
         key: 'quantity',
-        align: 'right',
-        width: 100,
+        
         render: (val: number) => (
             val !== null && val !== undefined ? (
                 <span style={{ color: '#1d4ed8', fontWeight: 600, fontSize: '12px' }}>
@@ -100,11 +98,10 @@ const soLineColumns: ColumnsType<SalesOrderLine> = [
         ),
     },
     {
-        title: 'ALLOCATED',
+        title: 'OA AGAINST B3',
         dataIndex: 'quantity',
         key: 'allocated',
-        align: 'right',
-        width: 100,
+        
         render: (val: number) => (
             val !== null && val !== undefined ? (
                 <span style={{ color: '#15803d', fontWeight: 600, fontSize: '12px' }}>
@@ -117,7 +114,6 @@ const soLineColumns: ColumnsType<SalesOrderLine> = [
         title: 'STATUS',
         key: 'status',
         align: 'center',
-        width: 120,
         render: () => (
             <Tag color="success" style={{ borderRadius: '12px', fontSize: '11px', fontWeight: 600, margin: 0 }}>
                 <CheckCircle2 size={12} style={{ marginRight: 4, verticalAlign: 'middle' }} />
@@ -160,13 +156,15 @@ const expandedRowRender = (record: AllocationFulfillment) => {
                 showHeader={true}
                 style={{ backgroundColor: 'transparent' }}
                 rowClassName={() => 'sub-table-row'}
+                scroll={{ y: 400, x: 0 }}
+                sticky={true}
             />
             {/* Totals row */}
             <div style={{
                 display: 'flex',
                 padding: '8px 16px',
                 marginTop: '8px',
-                borderTop: '1px solid #e2e8f0',
+                borderTop: '1px solid #0873ff',
                 fontSize: '12px',
                 fontWeight: 600,
                 color: '#475569',
@@ -177,10 +175,10 @@ const expandedRowRender = (record: AllocationFulfillment) => {
                 <span style={{ width: 120 }}></span>
                 <span style={{ width: 120 }}></span>
                 <span style={{ width: 144 }}></span>
-                <span style={{ width: 120 }}></span>
-                <span style={{ width: 100, textAlign: 'right', color: '#1d4ed8' }}>{totalQty.toLocaleString()}</span>
-                <span style={{ width: 150, textAlign: 'right', color: '#15803d' }}>{totalAllocated.toLocaleString()}</span>
-                <span style={{ width: 165, textAlign: 'center', marginLeft: '10px' }}>
+                <span style={{ width: 85 }}></span>
+                <span style={{ width: 10, textAlign: 'right', color: '#1d4ed8' }}>{totalQty.toLocaleString()}</span>
+                <span style={{ width: 145, textAlign: 'right', color: '#15803d' }}>{totalAllocated.toLocaleString()}</span>
+                <span style={{ width: 280, textAlign: 'right' }}>
                     <span style={{ color: approvedQty === totalQty ? '#15803d' : '#b45309', fontWeight: 600 }}>
                         {approvedQty === totalQty ? 'Fully Filled' : 'Partially Filled'}
                     </span>
@@ -276,7 +274,7 @@ function DateGroupHeader({
             </span>
 
             <span style={{ fontSize: '12px', color: '#475569' }}>
-                Allocated: <strong style={{ color: '#15803d' }}>{totalAllocated.toLocaleString()}</strong>
+                OA <ArrowRightLeft size={10} /> B3: <strong style={{ color: '#15803d' }}>{totalAllocated.toLocaleString()}</strong>
             </span>
 
             <span style={{ fontSize: '12px', color: '#475569' }}>
@@ -363,7 +361,6 @@ export default function FulfillmentTracker({ currentUser }: { currentUser: strin
         {
             title: '',
             key: 'expand',
-            width: 40,
             render: (_: unknown, record: AllocationFulfillment) => {
                 const isRowExpanded = expandedRowKeys.includes(record.lineId);
                 return (
@@ -383,19 +380,40 @@ export default function FulfillmentTracker({ currentUser }: { currentUser: strin
             title: 'B3 NUMBER',
             dataIndex: 'headerCode',
             key: 'headerCode',
-            width: 120,
             render: (code: string) => (
                 <span style={{ color: '#2563eb', fontWeight: 600, fontSize: '12px' }}>{code || '-'}</span>
             ),
         },
         {
+            title: 'Region',
+            dataIndex: 'region',
+            key: 'region',
+            render: (code: string) => (
+                <span style={{ color: '#2563eb', fontWeight: 600, fontSize: '12px' }}>{code || '-'}</span>
+            ),
+        },
+        {
+            title: 'CUSTOMER',
+            dataIndex: 'customerName',
+            key: 'customerName',
+            render: (name: string) => (
+                <span style={{ color: '#475569', fontWeight: 500, fontSize: '12px' }}>{name || '-'}</span>
+            ),
+        },
+        {
+            title: 'ORG',
+            dataIndex: 'organizationCode',
+            key: 'organizationCode',
+            render: (name: string) => (
+                <span style={{ color: '#475569', fontWeight: 500, fontSize: '12px' }}>{name || '-'}</span>
+            ),
+        },
+        {
             title: 'ITEM INFO',
             key: 'itemInfo',
-            width: 280,
             render: (_, record: AllocationFulfillment) => {
                 const code = record?.itemCode || 'N/A';
                 const description = record?.itemDescription || '';
-                const customerName = record?.customerName || 'N/A';
 
                 if (!record?.itemCode && !description) return '-';
 
@@ -415,8 +433,7 @@ export default function FulfillmentTracker({ currentUser }: { currentUser: strin
                     <div style={{ width: 'max-content', maxWidth: '320px', display: 'flex', flexDirection: 'column', gap: '4px', padding: '4px' }}>
                         {[
                             { label: 'CODE', val: code, bold: true, color: '#ffffff' },
-                            { label: 'NAME', val: description || 'N/A', bold: false, color: '#f1f5f9' },
-                            { label: 'CUSTOMER', val: customerName || '-', bold: false, color: '#f1f5f9' }
+                            { label: 'NAME', val: description || 'N/A', bold: false, color: '#f1f5f9' }
                         ].map(({ label, val, bold, color }) => (
                             <div key={label} style={{ display: 'flex', gap: '6px', fontSize: '12px', alignItems: 'baseline' }}>
                                 <span style={{ fontWeight: 700, color: '#93c5fd', fontSize: '11px', width: '75px', flexShrink: 0 }}>
@@ -451,20 +468,10 @@ export default function FulfillmentTracker({ currentUser }: { currentUser: strin
             },
         },
         {
-            title: 'CUSTOMER',
-            dataIndex: 'customerName',
-            key: 'customerName',
-            width: 220,
-            render: (name: string) => (
-                <span style={{ color: '#475569', fontWeight: 500, fontSize: '12px' }}>{name || '-'}</span>
-            ),
-        },
-        {
-            title: 'B3 QTY',
-            dataIndex: 'b3ApprovedQuantity',
+            title: 'B3 REQ QTY',
+            dataIndex: 'b3Quantity',
             key: 'b3ApprovedQuantity',
-            align: 'right',
-            width: 100,
+            
             render: (val: number) => (
                 val !== null && val !== undefined ? (
                     <span style={{ color: '#1d4ed8', fontWeight: 700, fontSize: '12px' }}>
@@ -474,11 +481,23 @@ export default function FulfillmentTracker({ currentUser }: { currentUser: strin
             ),
         },
         {
-            title: 'ALLOCATED',
+            title: 'B3 APP QTY',
+            dataIndex: 'b3ApprovedQuantity',
+            key: 'b3ApprovedQuantity',
+            width: 90,
+            render: (val: number) => (
+                val !== null && val !== undefined ? (
+                    <span style={{ color: '#1d4ed8', fontWeight: 700, fontSize: '12px' }}>
+                        {val.toLocaleString()}
+                    </span>
+                ) : '-'
+            ),
+        },
+        {
+            title: 'OA AGAINST B3',
             dataIndex: 'allocatedSoQuantity',
             key: 'allocatedSoQuantity',
-            align: 'right',
-            width: 100,
+            
             render: (val: number) => (
                 val !== null && val !== undefined ? (
                     <span style={{ color: '#15803d', fontWeight: 700, fontSize: '12px' }}>
@@ -491,7 +510,6 @@ export default function FulfillmentTracker({ currentUser }: { currentUser: strin
             title: 'PROGRESS',
             key: 'progress',
             align: 'center',
-            width: 160,
             render: (_: unknown, record: AllocationFulfillment) => {
                 if (!record) return '-';
                 const { status, pct } = getStatusInfo(record);
@@ -530,7 +548,6 @@ export default function FulfillmentTracker({ currentUser }: { currentUser: strin
             title: 'STATUS',
             key: 'status',
             align: 'center',
-            width: 130,
             render: (_: unknown, record: AllocationFulfillment) => {
                 if (!record) return '-';
                 const { status } = getStatusInfo(record);
@@ -591,7 +608,6 @@ export default function FulfillmentTracker({ currentUser }: { currentUser: strin
         });
 
         return Array.from(groups.entries())
-            .sort(([a], [b]) => a.localeCompare(b))
             .map(([transactionDate, lines]) => ({
                 groupKey: transactionDate,
                 transactionDate,
@@ -707,7 +723,7 @@ export default function FulfillmentTracker({ currentUser }: { currentUser: strin
                                         showHeader={true}
                                         loading={loading}
 
-                                        
+
                                         scroll={{ y: 400, x: 'max-content' }}
                                         sticky={true}
 

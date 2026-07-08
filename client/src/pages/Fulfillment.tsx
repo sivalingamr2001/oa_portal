@@ -1,6 +1,6 @@
 import { Button, Card, Input, InputNumber, message, Popover, Select, Space, Tag, Typography } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { ArrowRight, Edit, History, Plus, Truck } from 'lucide-react';
+import { ArrowRight, Edit, History, Plus } from 'lucide-react';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { AllocationRow } from '../api/allocationApi';
@@ -10,10 +10,11 @@ import { FilterHeader } from '../components/FilterHeader';
 import { Loader } from '../components/Loader';
 import { useAuth } from '../context/AuthContext';
 import { useLoader } from '../hooks/useLoader';
+import { formatDateForUI } from '../lib/constants';
 
 const { Option } = Select;
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 
 interface HeaderRecord {
   headerId: number;
@@ -94,7 +95,7 @@ export const Fulfillment: React.FC = () => {
       }
     });
 
-    return Array.from(map.values()).sort((a, b) => a.headerId - b.headerId);
+    return Array.from(map.values());
   }, [rawData]);
 
   const filteredHeaders = useMemo(() => {
@@ -122,13 +123,6 @@ export const Fulfillment: React.FC = () => {
 
     if (!finalReason || !finalReason.trim()) {
       message.warning('Please select or specify a reason for this amendment.');
-      return;
-    }
-
-    const line = rawData.find(l => l.lineId === lineId);
-    if (line && qty > line.b3Quantity) {
-      message.error(`Revision quantity (${qty}) cannot exceed the requested quantity (${line.b3Quantity}).`);
-      setActiveReviseLineId(null);
       return;
     }
 
@@ -185,15 +179,13 @@ export const Fulfillment: React.FC = () => {
       title: 'Lines',
       dataIndex: 'lines',
       key: 'lines',
-      render: (lines: AllocationRow[]) => lines.length,
-      sorter: (a, b) => a.lines.length - b.lines.length
+      render: (lines: AllocationRow[]) => lines.length
     },
     {
       title: 'Qty',
       dataIndex: 'totalRequestedQty',
       key: 'totalRequestedQty',
-      render: (value: number) => <strong>{value}</strong>,
-      sorter: (a, b) => a.totalRequestedQty - b.totalRequestedQty
+      render: (value: number) => <strong>{value}</strong>
     },
     // {
     //   title: 'Remarks',
@@ -240,8 +232,7 @@ export const Fulfillment: React.FC = () => {
       title: 'Created On',
       dataIndex: 'transactionDate',
       key: 'transactionDate',
-      render: (date: string) => new Date(date).toLocaleDateString(),
-      sorter: (a, b) => new Date(a.transactionDate).getTime() - new Date(b.transactionDate).getTime()
+      render: (date: string) => formatDateForUI(date),
     },
     // {
     //   title: 'Action',
@@ -296,7 +287,7 @@ export const Fulfillment: React.FC = () => {
       dataIndex: 'targetDate',
       key: 'targetDate',
       width: 120,
-      render: (date: string | null) => date ? new Date(date).toLocaleDateString() : '—'
+      render: (date: string) => formatDateForUI(date),
     },
     {
       title: 'Requested Qty',
@@ -381,7 +372,6 @@ export const Fulfillment: React.FC = () => {
                   <div style={{ fontSize: '12px', fontWeight: 500, marginBottom: 4 }}>New Quantity</div>
                   <InputNumber
                     min={1}
-                    max={line.b3Quantity}
                     value={revisionQty}
                     onChange={(val) => setRevisionQty(val || 0)}
                     style={{ width: '100%', borderRadius: 4 }}
@@ -470,11 +460,12 @@ export const Fulfillment: React.FC = () => {
         enableSearch={false}
         pagination={false}
         size="small"
+        sticky={true}
       />
     </Card>
   );
 
-  const extraActions = currentUser?.username !== 'JANHPL' ? (
+  const extraActions = currentUser?.username !== '' ? (
     <Button
       type="primary"
       onClick={() => navigate('/allocations')}
@@ -486,23 +477,19 @@ export const Fulfillment: React.FC = () => {
     </Button>
   ) : undefined;
 
+  const customHeader = (
+    <FilterHeader
+      activeFilter={activeFilter}
+      setActiveFilter={setActiveFilter}
+      filteredCount={filteredHeaders.length}
+    />)
+
   return (
-    <div className="dashboard-container" style={{ padding: 24 }}>
-      <div className="dashboard-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-        <Space direction="vertical" size={2}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Truck size={24} style={{ color: 'var(--primary-color)' }} />
-            <Title level={2} style={{ margin: 0, color: 'var(--text-primary)' }}>B3 Inputs</Title>
-          </div>
-        </Space>
-        <FilterHeader
-          activeFilter={activeFilter}
-          setActiveFilter={setActiveFilter}
-          filteredCount={filteredHeaders.length}
-        />
-      </div>
+    <div style={{ padding: 24 }}>
       {loading ? <div style={{ display: 'flex', justifyContent: "center", alignItems: "center", height: "80vh" }}><Loader isText={false} /></div> :
         <DynamicGrid<HeaderRecord>
+          title={`B3 Inputs`}
+          customHeader={customHeader}
           columns={headerColumns}
           dataSource={filteredHeaders}
           searchPlaceholder="Search"

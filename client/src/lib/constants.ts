@@ -1,3 +1,4 @@
+import dayjs from 'dayjs';
 import Logo from "@/assets/jana.png"
 import { useState, useEffect } from "react"
 
@@ -19,3 +20,23 @@ export function useDebounce<T>(value: T, delay?: number): T {
 
   return debouncedValue
 }
+
+/**
+ * Formats a date string into DD-MMM-YYYY format (e.g., 03-Jul-2026).
+ * @param {string | Date | null | undefined} dateInput - The raw date from the backend.
+ * @param {string} [fallback='-'] - Text to show if the date is invalid or missing.
+ * @returns {string} Formatted date string for the UI.
+ */
+export const formatDateForUI = (dateInput: string | Date | null | undefined, fallback: string = '-'): string => {
+  if (!dateInput || dateInput === 'unknown-date') {
+    return fallback;
+  }
+
+  const parsedDate = dayjs(dateInput);
+  
+  if (!parsedDate.isValid()) {
+    return fallback;
+  }
+
+  return parsedDate.format('DD-MMM-YYYY'); // Outputs: 03-Jul-2026
+};

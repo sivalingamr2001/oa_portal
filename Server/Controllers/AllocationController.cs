@@ -220,4 +220,11 @@ public sealed class AllocationController(IAllocationService allocationService) :
         var result = await _allocationService.GetFulfillmentDataAsync(currentUser);
         return Ok(result);
     }
+
+    [HttpGet("organaztion-id-by-invetoryandOU")]
+    public async Task<ActionResult<IEnumerable<OrganizationDto>>> GetOrgIdByInventoryIdandOuId(int InventoryId, int OuId, CancellationToken cancellationToken = default)
+    {
+        var result = await _allocationService.GetOrgIdByInventoryIdandOuId(InventoryId, OuId);
+        return Ok(result);
+    }
 }

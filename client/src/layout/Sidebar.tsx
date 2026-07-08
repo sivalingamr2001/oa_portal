@@ -16,7 +16,7 @@ const navigationItems = [
   {
     section: '',
     icon: Users,
-    items: [{ path: '/fulfillment', label: 'Create B3 Input' }],
+    items: [{ path: '/fulfillment', label: 'B3 Input' }],
   },
   {
     section: '',
